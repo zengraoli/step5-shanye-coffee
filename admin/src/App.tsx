@@ -3,6 +3,7 @@ import { AuthProvider } from '@/auth/AuthContext'
 import { RequireAuth } from '@/auth/RequireAuth'
 import { AppLayout } from '@/components/app/AppLayout'
 import { DashboardPage } from '@/pages/DashboardPage'
+import { AccountsPage } from '@/pages/AccountsPage'
 import { CouponsPage } from '@/pages/CouponsPage'
 import { MembersPage } from '@/pages/MembersPage'
 import { OrdersPage } from '@/pages/OrdersPage'
@@ -32,7 +33,7 @@ export default function App() {
           <Route path="/stores" element={<StoresPage />} />
           <Route path="/members" element={<MembersPage />} />
           <Route path="/coupons" element={<CouponsPage />} />
-          <Route path="/accounts" element={<PlaceholderPage />} />
+          <Route path="/accounts" element={<AccountsPage />} />
           <Route path="*" element={<PlaceholderPage />} />
         </Route>
       </Routes>

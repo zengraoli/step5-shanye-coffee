@@ -3,7 +3,7 @@ import { fail } from '../lib/errors.js'
 import { sendOk } from '../lib/response.js'
 import { isValidPhone } from '../lib/phone.js'
 import { issueToken, revokeToken } from '../lib/token.js'
-import { adminGuard, adminOnly, memberGuard } from '../lib/guards.js'
+import { adminGuard, memberGuard } from '../lib/guards.js'
 import { verifyPassword } from '../db/seed.js'
 import { serializeMember } from './points.js'
 
@@ -127,32 +127,6 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
         revokeToken(db, header.slice(7).trim())
       }
       return sendOk(reply, { loggedOut: true })
-    })
-
-    // 后台账号列表：仅管理员可见（店员访问返回 403）
-    instance.register(async (adminScope) => {
-      adminScope.addHook('preHandler', adminOnly())
-      adminScope.get('/api/v1/admin/accounts', { schema: { tags: ['admin'], summary: '后台账号列表（仅管理员）', security: [{ adminBearer: [] }] } }, async (request, reply) => {
-        const rows = db
-          .prepare(
-            `SELECT a.id, a.username, a.role, a.store_id, a.nickname, a.status, s.name AS store_name
-             FROM admin_users a LEFT JOIN stores s ON s.id = a.store_id
-             ORDER BY a.id`,
-          )
-          .all() as { id: number; username: string; role: string; store_id: number | null; nickname: string; status: string; store_name: string | null }[]
-        return sendOk(
-          reply,
-          rows.map((row) => ({
-            id: row.id,
-            username: row.username,
-            role: row.role,
-            storeId: row.store_id,
-            storeName: row.store_name,
-            nickname: row.nickname,
-            status: row.status,
-          })),
-        )
-      })
     })
   })
 }

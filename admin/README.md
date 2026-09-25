@@ -1,32 +1,79 @@
-# React + TypeScript + Vite
+# 山野咖啡 · 后台管理
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+React 19 + Vite + TypeScript + Tailwind CSS v4 + shadcn/ui（底层原语为 Base UI，未使用 Radix）+ Recharts + React Router。
 
-Currently, two official plugins are available:
+## 启动
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+```bash
+# 1. 先启动 API 服务（另开终端）
+cd server
+npm install
+npm run dev          # http://127.0.0.1:3000
 
-## React Compiler
-
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the Oxlint configuration
-
-If you are developing a production application, we recommend enabling type-aware lint rules by installing `oxlint-tsgolint` and editing `.oxlintrc.json`:
-
-```json
-{
-  "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": ["react", "typescript", "oxc"],
-  "options": {
-    "typeAware": true
-  },
-  "rules": {
-    "react/rules-of-hooks": "error",
-    "react/only-export-components": ["warn", { "allowConstantExport": true }]
-  }
-}
+# 2. 启动后台
+cd admin
+npm install
+npm run dev          # http://127.0.0.1:5101
 ```
 
-See the [Oxlint rules documentation](https://oxc.rs/docs/guide/usage/linter/rules) for the full list of rules and categories.
+接口地址默认指向 `http://127.0.0.1:3000`，可通过环境变量覆盖：
+
+```bash
+VITE_API_BASE_URL=http://127.0.0.1:3000 npm run dev
+```
+
+## 默认账号
+
+后台账号由 server 种子数据创建，用户名为 `admin`（管理员）与 `staff`（店员，绑定望京店）。
+
+密码不在代码中保存：首次启动 server 时通过环境变量 `ADMIN_PASSWORD` / `STAFF_PASSWORD` 指定；未指定则自动生成并打印在 server 启动日志中（仅显示一次）。账号的新增、停用、重置密码在「账号与角色」页面完成。
+
+会员登录演示验证码固定为 `123456`（小程序 / Web 端使用）。
+
+## 常用命令
+
+| 命令 | 说明 |
+|-|-|
+| `npm run dev` | 开发模式（端口 5101） |
+| `npm run build` | 类型检查 + 生产构建 |
+| `npm run typecheck` | TypeScript 类型检查 |
+| `npm test` | 单元测试（Vitest + Testing Library） |
+| `npm run preview` | 预览生产构建 |
+
+## 角色权限
+
+| 功能 | 管理员 | 店员 |
+|-|-|-|
+| 数据看板 | 全部门店 | 仅本门店 |
+| 订单管理 | 全部门店 | 仅本门店（列表与推进） |
+| 商品管理 | 新增 / 编辑 / 上下架 / 售罄 | 仅售罄切换 |
+| 门店管理 | 可编辑 | 不可见 |
+| 会员管理 | 可查看 | 不可见 |
+| 优惠券管理 | 可管理 | 不可见 |
+| 账号与角色 | 可管理 | 不可见 |
+
+菜单、按钮与路由均按角色控制；服务端同样会做角色校验，前端隐藏只是体验优化。
+
+## 页面
+
+- 登录：账号密码登录，未登录访问受保护页面会跳转登录页
+- 数据看板：今日营业额 / 订单量 / 客单价 / 新增会员、近 7 天营业额趋势、热销 Top10、最新订单
+- 订单管理：按门店 / 状态 / 日期 / 关键词筛选，订单详情，推进订单状态
+- 商品管理：商品列表（筛选、分页）、新增与编辑、上下架、售罄
+- 门店管理：门店信息与营业时间编辑（营业状态按北京时间自动计算）
+- 会员管理：会员列表（手机号脱敏）、等级与积分、订单与优惠券详情
+- 优惠券管理：满减券 / 折扣券模板的创建、编辑、停用
+- 账号与角色：账号新增、停用、重置密码、角色与门店分配
+
+## 设计说明
+
+- 品牌主题变量集中在 `src/index.css`（深山棕主色、焦糖点缀、抹茶辅助），三个前端共用同一套品牌视觉
+- 插画与图标均为自绘 SVG 或 Lucide 图标，不依赖外部图片或 CDN
+- 金额在界面统一格式化为 `¥xx.xx`（接口传输为整数“分”）；时间按北京时间展示（接口为 UTC ISO8601）
+
+## 已知问题
+
+- 支付为模拟支付；后台不提供收银台，订单支付在小程序 / Web 端完成
+- 暂无操作日志与登录日志页面（服务端仅记录请求日志）
+- 数据看板暂不支持自定义日期范围（固定今天与近 7 天）
+- 会员详情中的优惠券暂不支持手动核销
