@@ -2,6 +2,7 @@ import { Navigate, Route, Routes } from 'react-router-dom'
 import { AuthProvider } from '@/auth/AuthContext'
 import { RequireAuth } from '@/auth/RequireAuth'
 import { AppLayout } from '@/components/app/AppLayout'
+import { DashboardPage } from '@/pages/DashboardPage'
 import { LoginPage } from '@/pages/LoginPage'
 import { PlaceholderPage } from '@/pages/PlaceholderPage'
 
@@ -20,7 +21,7 @@ export default function App() {
           }
         >
           <Route index element={<Navigate to="/dashboard" replace />} />
-          <Route path="/dashboard" element={<PlaceholderPage />} />
+          <Route path="/dashboard" element={<DashboardPage />} />
           <Route path="/orders" element={<PlaceholderPage />} />
           <Route path="/products" element={<PlaceholderPage />} />
           <Route path="/stores" element={<PlaceholderPage />} />
