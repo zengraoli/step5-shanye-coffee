@@ -1,0 +1,52 @@
+/* ============================================================
+   山野咖啡 · 品牌主题变量（miniapp 端主题文件）
+   三端（admin / web / miniapp）共用同一套品牌视觉：
+   主色深山棕、点缀焦糖、辅助抹茶、底色米白。
+   ============================================================ */
+
+/* 品牌色板 */
+$brand-900: #2b2118; /* 墨咖 */
+$brand-700: #4a3728; /* 深山棕（主色） */
+$brand-500: #6b4f3a; /* 焙棕 */
+$brand-300: #a68a6d; /* 浅焙 */
+$caramel-600: #b07f4a; /* 深焦糖 */
+$caramel-500: #c89b6a; /* 焦糖（点缀） */
+$caramel-300: #e8c9a0; /* 浅焦糖 */
+$matcha-600: #5f7d4f; /* 深抹茶 */
+$matcha-500: #7d9b6a; /* 抹茶 */
+$cream-50: #faf6ef; /* 米白（页面底色） */
+$cream-100: #f3ece0; /* 燕麦奶 */
+$cream-200: #e9dfd0; /* 奶泡（分隔线） */
+$paper: #fffdf9; /* 纸白 */
+
+/* 语义变量 */
+$color-bg: $cream-50;
+$color-surface: $paper;
+$color-surface-muted: $cream-100;
+$color-text: $brand-900;
+$color-text-soft: #6f6255;
+$color-text-faint: #9a8d7d;
+$color-primary: $brand-700;
+$color-primary-strong: $brand-900;
+$color-accent: $caramel-500;
+$color-accent-strong: $caramel-600;
+$color-success: $matcha-600;
+$color-line: $cream-200;
+
+/* 字体层级 */
+$font-display: 'Songti SC', 'Noto Serif SC', 'SimSun', Georgia, serif;
+$font-body: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Hiragino Sans GB',
+  'Microsoft YaHei', sans-serif;
+
+/* 圆角 */
+$radius-sm: 8rpx;
+$radius-md: 14rpx;
+$radius-lg: 22rpx;
+$radius-full: 999rpx;
+
+/* 间距 */
+$space-1: 8rpx;
+$space-2: 16rpx;
+$space-3: 24rpx;
+$space-4: 32rpx;
+$space-5: 48rpx;
