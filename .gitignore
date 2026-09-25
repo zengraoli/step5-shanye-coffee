@@ -10,3 +10,8 @@ coverage/
 .env.*
 *.log
 .DS_Store
+*.db-shm
+*.db-wal
+*.sqlite-shm
+*.sqlite-wal
+server/data/

@@ -1,7 +1,7 @@
 # T01 项目骨架
 
 阶段：S0 server
-状态：待完成
+状态：已完成（v0.1，2026-09-26）
 
 ## 要做什么
 Fastify + TypeScript + SQLite 项目骨架；统一响应格式与全局错误处理；错误码登记在 `server/docs/errors.md`。
