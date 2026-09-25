@@ -78,6 +78,7 @@ ADMIN_PASSWORD=xxx STAFF_PASSWORD=xxx npm run dev
 | 后台账号 | `GET /api/v1/admin/accounts` |
 | 后台看板 | `GET /api/v1/admin/dashboard` |
 | 后台门店 | `GET /api/v1/admin/stores`、`PUT /api/v1/admin/stores/:id` |
+| 活动（第二杯半价） | `GET /api/v1/promo`、`GET/PUT /api/v1/admin/promo` |
 
 鉴权方式：请求头 `Authorization: Bearer <token>`，会员与后台 token 不通用。
 
@@ -88,3 +89,4 @@ ADMIN_PASSWORD=xxx STAFF_PASSWORD=xxx npm run dev
 - 商品 `image` 字段已预留，但种子数据未附带本地图片资源，前端暂用自绘插画占位。
 - SQLite 为单文件数据库，高并发写入依赖 `busy_timeout` 重试，未做读写分离。
 - 优惠券为整券模板发放，暂不支持批量发放与定向发券。
+- 第二杯半价活动按“同一订单中同一适用商品的第 2、4… 杯半价”计价，与优惠券叠加时先算活动价再用券。

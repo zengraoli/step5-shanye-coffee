@@ -144,10 +144,12 @@ test('下单报价自动推荐最优券并计算金额明细', async () => {
     const data = quote.json().data
     // 3200 + 300（大杯）= 3500 × 2 = 7000
     assert.equal(data.totalFen, 7000)
-    // 8.5 折减 1050，优于满 50 减 10（1000）
-    assert.equal(data.discountFen, 1050)
-    assert.equal(data.payFen, 5950)
-    assert.equal(data.bestCouponId, claimDiscount.json().data.id)
+    // 第二杯半价减 1750 → 活动后 5250
+    assert.equal(data.promoDiscountFen, 1750)
+    // 活动后金额：满 50 减 10（1000）优于 8.5 折（787）
+    assert.equal(data.discountFen, 1000)
+    assert.equal(data.payFen, 4250)
+    assert.equal(data.bestCouponId, claimFull.json().data.id)
     assert.equal(data.items.length, 1)
     assert.equal(data.items[0].amount, 7000)
     assert.equal(data.items[0].specText, '大杯 / 冰 / 少糖')
@@ -160,7 +162,7 @@ test('下单报价自动推荐最优券并计算金额明细', async () => {
       payload: { storeId: 1, orderType: 'takeout', items: CART, memberCouponId: claimFull.json().data.id },
     })
     assert.equal(manual.json().data.discountFen, 1000)
-    assert.equal(manual.json().data.payFen, 6000)
+    assert.equal(manual.json().data.payFen, 4250)
     assert.equal(manual.json().data.selectedCouponId, claimFull.json().data.id)
   } finally {
     await app.close()
@@ -191,8 +193,10 @@ test('可以选择不使用优惠券（withoutCoupon）', async () => {
     })
     assert.equal(quote.statusCode, 200, quote.body)
     const data = quote.json().data
+    // 不使用券时仍享受活动价
     assert.equal(data.discountFen, 0)
-    assert.equal(data.payFen, data.totalFen)
+    assert.equal(data.promoDiscountFen, 1750)
+    assert.equal(data.payFen, 5250)
     assert.equal(data.bestCouponId, null)
     assert.equal(data.selectedCouponId, null)
     const coupons = await app.inject({

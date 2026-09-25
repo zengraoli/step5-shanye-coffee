@@ -7,6 +7,7 @@ import { AccountsPage } from '@/pages/AccountsPage'
 import { CouponsPage } from '@/pages/CouponsPage'
 import { MembersPage } from '@/pages/MembersPage'
 import { OrdersPage } from '@/pages/OrdersPage'
+import { PromoPage } from '@/pages/PromoPage'
 import { StoresPage } from '@/pages/StoresPage'
 import { ProductsPage } from '@/pages/ProductsPage'
 import { LoginPage } from '@/pages/LoginPage'
@@ -34,6 +35,7 @@ export default function App() {
           <Route path="/members" element={<MembersPage />} />
           <Route path="/coupons" element={<CouponsPage />} />
           <Route path="/accounts" element={<AccountsPage />} />
+          <Route path="/promo" element={<PromoPage />} />
           <Route path="*" element={<PlaceholderPage />} />
         </Route>
       </Routes>

@@ -15,6 +15,7 @@ import {
   type OrderStatus,
 } from '../lib/order-status.js'
 import { priceCart, type CartItemInput } from './pricing.js'
+import { promoDiscountFor } from './promo.js'
 import { specLabel } from '../lib/specs.js'
 import { grantPointsForOrder } from './points.js'
 import { withTransaction } from '../db/tx.js'
@@ -32,6 +33,7 @@ interface OrderRow {
   total_fen: number
   discount_fen: number
   pay_fen: number
+  promo_discount_fen: number
   member_coupon_id: number | null
   pickup_code: string | null
   remark: string
@@ -72,6 +74,8 @@ export interface OrderDetail {
   }[]
   totalFen: number
   discountFen: number
+  /** 第二杯半价活动优惠金额（分） */
+  promoDiscountFen: number
   payFen: number
   coupon: { id: number; name: string; discountFen: number } | null
   pickupCode: string | null
@@ -175,6 +179,7 @@ function serializeOrder(db: Db, order: OrderRow): OrderDetail {
     }),
     totalFen: order.total_fen,
     discountFen: order.discount_fen,
+    promoDiscountFen: order.promo_discount_fen ?? 0,
     payFen: order.pay_fen,
     coupon,
     pickupCode: order.pickup_code,
@@ -223,6 +228,11 @@ export async function orderRoutes(app: FastifyInstance): Promise<void> {
       const remark = typeof body.remark === 'string' ? body.remark.trim().slice(0, 100) : ''
       const { lines, totalFen } = priceCart(db, body.items as CartItemInput[])
 
+      // 第二杯半价：先算活动价，优惠券按活动后金额计算
+      const promo = promoDiscountFor(db, lines)
+      const promoDiscountFen = promo.discountFen
+      const afterPromoFen = totalFen - promoDiscountFen
+
       // 优惠券校验（不核销，支付时才核销）
       let memberCouponId: number | null = null
       let discountFen = 0
@@ -255,7 +265,7 @@ export async function orderRoutes(app: FastifyInstance): Promise<void> {
         if (!isWithinValidity(like)) {
           fail('COUPON_EXPIRED')
         }
-        const discount = couponDiscountFen(like, totalFen)
+        const discount = couponDiscountFen(like, afterPromoFen)
         if (discount <= 0) {
           fail('COUPON_NOT_APPLICABLE')
         }
@@ -266,8 +276,8 @@ export async function orderRoutes(app: FastifyInstance): Promise<void> {
       const orderId = withTransaction(db, () => {
         const info = db
           .prepare(
-            `INSERT INTO orders (order_no, member_id, store_id, order_type, status, total_fen, discount_fen, pay_fen, member_coupon_id, remark, created_at)
-             VALUES (?, ?, ?, ?, 'pending_pay', ?, ?, ?, ?, ?, ?)`,
+            `INSERT INTO orders (order_no, member_id, store_id, order_type, status, total_fen, discount_fen, pay_fen, promo_discount_fen, member_coupon_id, remark, created_at)
+             VALUES (?, ?, ?, ?, 'pending_pay', ?, ?, ?, ?, ?, ?, ?)`,
           )
           .run(
             uniqueOrderNo(db),
@@ -276,7 +286,8 @@ export async function orderRoutes(app: FastifyInstance): Promise<void> {
             body.orderType as string,
             totalFen,
             discountFen,
-            totalFen - discountFen,
+            afterPromoFen - discountFen,
+            promoDiscountFen,
             memberCouponId,
             remark,
             new Date().toISOString(),

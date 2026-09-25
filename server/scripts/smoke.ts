@@ -89,7 +89,13 @@ async function main(): Promise<void> {
     const couponId = claim.body.data.id
 
     // 5. 下单报价
-    const quote = await api<{ totalFen: number; discountFen: number; payFen: number; bestCouponId: number | null }>(
+    const quote = await api<{
+      totalFen: number
+      promoDiscountFen: number
+      discountFen: number
+      payFen: number
+      bestCouponId: number | null
+    }>(
       'POST',
       '/api/v1/orders/quote',
       {
@@ -104,8 +110,11 @@ async function main(): Promise<void> {
     )
     check(
       '下单报价',
-      quote.body.data.totalFen === 7000 && quote.body.data.discountFen === 1000 && quote.body.data.payFen === 6000,
-      `原价 ${quote.body.data.totalFen} 分，优惠 ${quote.body.data.discountFen} 分，实付 ${quote.body.data.payFen} 分`,
+      quote.body.data.totalFen === 7000 &&
+        quote.body.data.promoDiscountFen === 1750 &&
+        quote.body.data.discountFen === 1000 &&
+        quote.body.data.payFen === 4250,
+      `原价 ${quote.body.data.totalFen} 分，活动减 ${quote.body.data.promoDiscountFen} 分，券减 ${quote.body.data.discountFen} 分，实付 ${quote.body.data.payFen} 分`,
     )
 
     // 6. 创建订单
@@ -181,8 +190,8 @@ async function main(): Promise<void> {
     )
     check(
       '积分到账',
-      points.body.data.profile.points === 60 && points.body.data.logs.length === 1,
-      `${points.body.data.profile.points} 分（${points.body.data.profile.levelText}）`,
+      points.body.data.profile.points === 42 && points.body.data.logs.length === 1,
+      `${points.body.data.profile.points} 分（${points.body.data.profile.levelText}，按实付 4250 分累计）`,
     )
 
     // 12. 未登录访问受保护接口

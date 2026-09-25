@@ -13,6 +13,7 @@ interface OrderData {
   statusText: string
   totalFen: number
   discountFen: number
+  promoDiscountFen: number
   payFen: number
   pickupCode: string | null
   coupon: { id: number; name: string; discountFen: number } | null
@@ -43,8 +44,10 @@ test('创建订单：金额明细正确并生成订单号', async () => {
     assert.equal(res.statusCode, 201, res.body)
     const order = res.json().data as OrderData
     assert.equal(order.totalFen, 7000)
+    // 第二杯半价：同商品第 2 杯减 1750 分
+    assert.equal(order.promoDiscountFen, 1750)
     assert.equal(order.discountFen, 0)
-    assert.equal(order.payFen, 7000)
+    assert.equal(order.payFen, 5250)
     assert.equal(order.status, 'pending_pay')
     assert.equal(order.pickupCode, null)
     assert.match(order.orderNo, /^SY\d{8}\d{6}$/)
@@ -71,8 +74,10 @@ test('创建订单：使用优惠券后实付金额正确', async () => {
     assert.equal(res.statusCode, 201, res.body)
     const order = res.json().data as OrderData
     assert.equal(order.totalFen, 7000)
+    assert.equal(order.promoDiscountFen, 1750)
+    // 券按活动后金额 5250 计算：满 50 减 10
     assert.equal(order.discountFen, 1000)
-    assert.equal(order.payFen, 6000)
+    assert.equal(order.payFen, 4250)
     assert.equal(order.coupon?.id, couponId)
 
     // 未支付前优惠券仍未核销
@@ -139,7 +144,8 @@ test('支付后生成 4 位取餐码并核销优惠券', async () => {
     const paid = pay.json().data as OrderData
     assert.equal(paid.status, 'paid')
     assert.match(paid.pickupCode!, /^\d{4}$/)
-    assert.equal(paid.payFen, 6000)
+    assert.equal(paid.promoDiscountFen, 1750)
+    assert.equal(paid.payFen, 4250)
 
     const used = await app.inject({
       method: 'GET',

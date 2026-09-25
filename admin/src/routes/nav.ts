@@ -2,6 +2,7 @@
 import {
   BadgePercent,
   LayoutDashboard,
+  Percent,
   Package,
   ReceiptText,
   ShieldCheck,
@@ -70,6 +71,13 @@ export const NAV_ITEMS: NavItem[] = [
     icon: ShieldCheck,
     roles: ['admin'],
     description: '后台账号、停用与角色分配',
+  },
+  {
+    to: '/promo',
+    label: '活动管理',
+    icon: Percent,
+    roles: ['admin'],
+    description: '第二杯半价活动的时间与适用商品',
   },
 ]
 

@@ -2,9 +2,10 @@ import { describe, expect, test } from 'vitest'
 import { canAccessPath, navItemsForRole, NAV_ITEMS } from './nav'
 
 describe('导航权限', () => {
-  test('管理员看到全部 7 个菜单', () => {
+  test('管理员看到全部菜单（含活动管理）', () => {
     expect(navItemsForRole('admin')).toHaveLength(NAV_ITEMS.length)
-    expect(navItemsForRole('admin')).toHaveLength(7)
+    expect(navItemsForRole('admin')).toHaveLength(8)
+    expect(navItemsForRole('admin').map((item) => item.to)).toContain('/promo')
   })
 
   test('店员只看板、订单、商品三个菜单', () => {

@@ -6,6 +6,7 @@ import { couponRoutes } from '../modules/coupons.js'
 import { dashboardRoutes } from '../modules/dashboard.js'
 import { memberRoutes } from '../modules/members.js'
 import { orderRoutes } from '../modules/orders.js'
+import { promoRoutes } from '../modules/promo.js'
 import { productRoutes } from '../modules/products.js'
 import { storeRoutes } from '../modules/stores.js'
 
@@ -16,6 +17,7 @@ export async function registerRoutes(app: FastifyInstance): Promise<void> {
   await app.register(productRoutes)
   await app.register(couponRoutes)
   await app.register(orderRoutes)
+  await app.register(promoRoutes)
   await app.register(memberRoutes)
   await app.register(dashboardRoutes)
   await app.register(adminStoreRoutes)

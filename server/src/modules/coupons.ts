@@ -11,6 +11,7 @@ import {
 } from '../lib/coupon.js'
 import { isWithinBusinessHours } from '../lib/time.js'
 import { adminGuard, adminOnly, memberGuard } from '../lib/guards.js'
+import { promoDiscountFor } from './promo.js'
 import { withTransaction } from '../db/tx.js'
 import { priceCart, type CartItemInput } from './pricing.js'
 
@@ -217,6 +218,11 @@ export async function couponRoutes(app: FastifyInstance): Promise<void> {
       const { lines, totalFen } = priceCart(db, body.items as CartItemInput[])
       const now = new Date()
 
+      // 第二杯半价：先算活动价，优惠券按活动后金额计算
+      const promo = promoDiscountFor(db, lines, now)
+      const promoDiscountFen = promo.discountFen
+      const afterPromoFen = totalFen - promoDiscountFen
+
       const ownCoupons = db
         .prepare(
           `SELECT mc.*, c.name, c.type, c.threshold_fen, c.reduce_fen, c.discount_percent, c.max_reduce_fen
@@ -243,7 +249,7 @@ export async function couponRoutes(app: FastifyInstance): Promise<void> {
           maxReduceFen: row.max_reduce_fen,
           validTo: row.valid_to,
           usable: valid,
-          discountFen: valid ? couponDiscountFen(coupon, totalFen) : 0,
+          discountFen: valid ? couponDiscountFen(coupon, afterPromoFen) : 0,
         }
       })
 
@@ -261,17 +267,17 @@ export async function couponRoutes(app: FastifyInstance): Promise<void> {
         if (!isWithinValidity(toCouponLike(selected), now)) {
           fail('COUPON_EXPIRED')
         }
-        const discount = couponDiscountFen(toCouponLike(selected), totalFen)
+        const discount = couponDiscountFen(toCouponLike(selected), afterPromoFen)
         if (discount <= 0) {
           fail('COUPON_NOT_APPLICABLE')
         }
         selectedId = selected.id
         discountFen = discount
       } else if (!withoutCoupon) {
-        const best = pickBestCoupon(candidates, totalFen, now)
+        const best = pickBestCoupon(candidates, afterPromoFen, now)
         if (best) {
           selectedId = best.id
-          discountFen = couponDiscountFen(best, totalFen)
+          discountFen = couponDiscountFen(best, afterPromoFen)
         }
       }
 
@@ -281,8 +287,18 @@ export async function couponRoutes(app: FastifyInstance): Promise<void> {
         orderType: body.orderType,
         items: lines,
         totalFen,
+        promoDiscountFen,
         discountFen,
-        payFen: totalFen - discountFen,
+        payFen: afterPromoFen - discountFen,
+        promo: promo.activity
+          ? {
+              id: promo.activity.id,
+              name: promo.activity.name,
+              type: promo.activity.type,
+              discountFen: promoDiscountFen,
+              productIds: promo.activity.productIds,
+            }
+          : null,
         coupons: couponOptions,
         bestCouponId: selectedId,
         selectedCouponId: selectedId,

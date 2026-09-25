@@ -122,7 +122,36 @@ export const MIGRATIONS: string[] = [
   `CREATE INDEX IF NOT EXISTS idx_orders_store_status ON orders(store_id, status)`,
   `CREATE INDEX IF NOT EXISTS idx_order_items_order ON order_items(order_id)`,
   `CREATE INDEX IF NOT EXISTS idx_points_logs_member ON points_logs(member_id)`,
+  /* ---------- 第二杯半价活动 ---------- */
+  `CREATE TABLE IF NOT EXISTS promo_activities (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    type TEXT NOT NULL DEFAULT 'second_half',
+    status TEXT NOT NULL DEFAULT 'inactive',
+    start_at TEXT NOT NULL,
+    end_at TEXT NOT NULL,
+    created_at TEXT NOT NULL
+  )`,
+  `CREATE TABLE IF NOT EXISTS promo_activity_products (
+    activity_id INTEGER NOT NULL REFERENCES promo_activities(id) ON DELETE CASCADE,
+    product_id INTEGER NOT NULL REFERENCES products(id),
+    PRIMARY KEY (activity_id, product_id)
+  )`,
 ]
+
+/**
+ * 兼容已有数据库：为 orders 增加活动优惠金额字段。
+ * （CREATE TABLE IF NOT EXISTS 不会给旧表补列，需要显式 ALTER。）
+ */
+export function migrateSchema(db: {
+  prepare: (sql: string) => { all: () => unknown[] }
+  exec: (sql: string) => unknown
+}): void {
+  const columns = db.prepare('PRAGMA table_info(orders)').all() as { name: string }[]
+  if (!columns.some((column) => column.name === 'promo_discount_fen')) {
+    db.exec('ALTER TABLE orders ADD COLUMN promo_discount_fen INTEGER NOT NULL DEFAULT 0')
+  }
+}
 
 /** 执行建表（幂等） */
 export function migrate(db: {

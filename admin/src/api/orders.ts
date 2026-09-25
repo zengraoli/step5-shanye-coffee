@@ -39,6 +39,8 @@ export interface AdminOrderItem {
 }
 
 export interface AdminOrderDetail extends AdminOrderSummary {
+  /** 第二杯半价活动优惠金额（分） */
+  promoDiscountFen: number
   items: AdminOrderItem[]
   coupon: { id: number; name: string; discountFen: number } | null
   timeline: { status: OrderStatus; statusText: string; time: string | null }[]

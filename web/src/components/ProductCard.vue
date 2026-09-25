@@ -6,6 +6,8 @@ import { formatMoney } from '@/utils/format'
 defineProps<{
   product: Product
   featured?: boolean
+  /** 是否参与第二杯半价活动 */
+  promo?: boolean
 }>()
 </script>
 
@@ -14,6 +16,7 @@ defineProps<{
     <div class="product-card__art">
       <ProductArt :category="product.categoryName" :size="96" />
       <span v-if="featured" class="product-card__badge">当季推荐</span>
+      <span v-else-if="promo" class="product-card__promo">第二杯半价</span>
       <span v-if="product.soldOut" class="product-card__mask">已售罄</span>
     </div>
     <div class="product-card__body">
@@ -70,6 +73,18 @@ defineProps<{
   letter-spacing: 0.08em;
   background: var(--color-primary);
   color: var(--cream-50);
+}
+
+.product-card__promo {
+  position: absolute;
+  top: var(--space-3);
+  left: var(--space-3);
+  border-radius: var(--radius-full);
+  padding: 3px 10px;
+  font-size: var(--text-xs);
+  letter-spacing: 0.08em;
+  background: linear-gradient(120deg, var(--caramel-500), var(--caramel-600));
+  color: #fff;
 }
 
 .product-card__mask {

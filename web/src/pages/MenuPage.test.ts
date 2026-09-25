@@ -55,6 +55,21 @@ vi.mock('@/api/catalog', () => ({
   fetchProducts: vi.fn(async () => ({ list: PRODUCTS, total: 3, page: 1, pageSize: 60 })),
 }))
 
+vi.mock('@/api/promo', () => ({
+  fetchPromo: vi.fn(async () => ({
+    active: true,
+    activity: {
+      id: 1,
+      name: '第二杯半价',
+      type: 'second_half',
+      status: 'active',
+      startAt: '2026-09-01T00:00:00.000Z',
+      endAt: '2026-12-31T23:59:59.000Z',
+      productIds: [1],
+    },
+  })),
+}))
+
 function mountPage() {
   const router = createRouter({
     history: createWebHistory(),
@@ -85,6 +100,18 @@ describe('MenuPage', () => {
     expect(text).toContain('已售罄')
     // 规格说明
     expect(text).toContain('+¥3.00')
+  })
+
+  test('展示第二杯半价活动标识', async () => {
+    const wrapper = mountPage()
+    await flushPromises()
+    const text = wrapper.text()
+    expect(text).toContain('第二杯半价')
+    expect(text).toContain('活动商品同单第 2、4… 杯半价')
+    // 商品 1 参与活动，商品 2 不参与
+    const cards = wrapper.findAll('.product-card')
+    expect(cards[0]!.find('.product-card__promo').exists()).toBe(true)
+    expect(cards[1]!.find('.product-card__promo').exists()).toBe(false)
   })
 
   test('点击分类后只显示该分类商品', async () => {

@@ -29,8 +29,17 @@ export interface QuoteResult {
   orderType: 'takeout' | 'dine_in'
   items: MemberOrderItem[]
   totalFen: number
+  /** 第二杯半价活动优惠金额（分） */
+  promoDiscountFen: number
   discountFen: number
   payFen: number
+  promo: {
+    id: number
+    name: string
+    type: 'second_half'
+    discountFen: number
+    productIds: number[]
+  } | null
   coupons: QuoteCoupon[]
   bestCouponId: number | null
   selectedCouponId: number | null

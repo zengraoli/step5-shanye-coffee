@@ -415,6 +415,10 @@ function OrderDetailDialog({ open, order, onClose }: OrderDetailDialogProps) {
             <div className="space-y-1 rounded-lg bg-muted/60 p-3 text-sm">
               <AmountRow label="原价" value={formatMoney(order.totalFen)} />
               <AmountRow
+                label="活动优惠（第二杯半价）"
+                value={`-${formatMoney(order.promoDiscountFen)}`}
+              />
+              <AmountRow
                 label={`优惠${order.coupon ? `（${order.coupon.name}）` : ''}`}
                 value={`-${formatMoney(order.discountFen)}`}
               />

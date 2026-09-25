@@ -1,7 +1,7 @@
 import { mkdirSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
-import { migrate } from './schema.js'
+import { migrate, migrateSchema } from './schema.js'
 import { seed, type SeededCredential } from './seed.js'
 
 export type Db = DatabaseSync
@@ -34,6 +34,7 @@ export function openDb(options: OpenDbOptions): OpenedDb {
   db.exec('PRAGMA foreign_keys = ON')
   db.exec('PRAGMA busy_timeout = 3000')
   migrate(db)
+  migrateSchema(db)
   const seededCredentials = options.withSeed === false ? [] : seed(db)
   return { db, seededCredentials }
 }

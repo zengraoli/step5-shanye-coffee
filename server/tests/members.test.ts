@@ -40,20 +40,21 @@ test('支付后按实付金额积分并记录流水', async () => {
       url: '/api/v1/members/me',
       headers: { authorization: `Bearer ${token}` },
     })
-    assert.equal(me.json().data.points, 70)
+    // 实付 5250 分（活动减 1750）→ 52 分
+    assert.equal(me.json().data.points, 52)
     assert.equal(me.json().data.level, 'silver')
     assert.equal(me.json().data.levelText, '银卡')
     assert.equal(me.json().data.nextLevel, 'gold')
-    assert.equal(me.json().data.pointsToNextLevel, 430)
+    assert.equal(me.json().data.pointsToNextLevel, 448)
 
     const points = await app.inject({
       method: 'GET',
       url: '/api/v1/members/me/points',
       headers: { authorization: `Bearer ${token}` },
     })
-    assert.equal(points.json().data.totalEarned, 70)
+    assert.equal(points.json().data.totalEarned, 52)
     assert.equal(points.json().data.logs.length, 1)
-    assert.equal(points.json().data.logs[0].change, 70)
+    assert.equal(points.json().data.logs[0].change, 52)
     assert.equal(points.json().data.logs[0].reason, '消费积分')
   } finally {
     await app.close()
@@ -65,8 +66,8 @@ test('积分累计到 500 自动升级金卡，2000 升级黑卡', async () => {
   const token = await loginMember(app, '13600000002')
   try {
     forceStoreOpen(db, 1)
-    // 每单实付 7000 分 = 70 分，8 单后 560 分 → 金卡
-    for (let i = 0; i < 8; i += 1) {
+    // 每单实付 5250 分 = 52 分，10 单后 520 分 → 金卡
+    for (let i = 0; i < 10; i += 1) {
       await payOnce(app, token, '13600000002')
     }
     const me = await app.inject({
@@ -74,11 +75,11 @@ test('积分累计到 500 自动升级金卡，2000 升级黑卡', async () => {
       url: '/api/v1/members/me',
       headers: { authorization: `Bearer ${token}` },
     })
-    assert.equal(me.json().data.points, 560)
+    assert.equal(me.json().data.points, 520)
     assert.equal(me.json().data.level, 'gold')
     assert.equal(me.json().data.levelText, '金卡')
     assert.equal(me.json().data.nextLevel, 'black')
-    assert.equal(me.json().data.pointsToNextLevel, 1440)
+    assert.equal(me.json().data.pointsToNextLevel, 1480)
 
     // 直接调整积分到 2000 以上，下次支付后应升级黑卡
     db.prepare('UPDATE members SET points = ?, level = ? WHERE phone = ?').run(1990, 'gold', '13600000002')
@@ -88,7 +89,7 @@ test('积分累计到 500 自动升级金卡，2000 升级黑卡', async () => {
       url: '/api/v1/members/me',
       headers: { authorization: `Bearer ${token}` },
     })
-    assert.equal(after.json().data.points, 2060)
+    assert.equal(after.json().data.points, 2042)
     assert.equal(after.json().data.level, 'black')
     assert.equal(after.json().data.nextLevel, null)
   } finally {
@@ -124,8 +125,8 @@ test('使用优惠券后按实付积分（不按原价）', async () => {
       url: '/api/v1/members/me',
       headers: { authorization: `Bearer ${token}` },
     })
-    // 实付 6000 分 = 60 元 → 60 分
-    assert.equal(me.json().data.points, 60)
+    // 活动后 5250，券减 1000 → 实付 4250 分 = 42 分
+    assert.equal(me.json().data.points, 42)
   } finally {
     await app.close()
   }
@@ -148,9 +149,9 @@ test('后台会员列表手机号脱敏，详情包含订单与积分', async ()
     const rows = list.json().data.list as { phone: string; points: number; orderCount: number; totalPayFen: number }[]
     assert.equal(rows.length, 1)
     assert.equal(rows[0]?.phone, '136****0004')
-    assert.equal(rows[0]?.points, 70)
+    assert.equal(rows[0]?.points, 52)
     assert.equal(rows[0]?.orderCount, 1)
-    assert.equal(rows[0]?.totalPayFen, 7000)
+    assert.equal(rows[0]?.totalPayFen, 5250)
 
     const byKeyword = await app.inject({
       method: 'GET',

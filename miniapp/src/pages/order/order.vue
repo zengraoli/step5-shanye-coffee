@@ -4,12 +4,14 @@ import { fetchCategories, fetchProducts, fetchStores, type Category, type Produc
 import { ApiError } from '@/api/client'
 import { useCart } from '@/composables/useCart'
 import { useCurrentStore } from '@/composables/useCurrentStore'
+import { usePromo } from '@/composables/usePromo'
 import { buildCartItem } from '@/utils/cart'
 import { formatMoney } from '@/utils/format'
 import { specExtra, specText, type SpecSelection } from '@/utils/specs'
 import TabBar from '@/components/TabBar.vue'
 
 const { currentStore, select } = useCurrentStore()
+const { isPromoProduct, load: loadPromo } = usePromo()
 const cart = useCart()
 
 const categories = ref<Category[]>([])
@@ -62,6 +64,8 @@ onMounted(async () => {
     measureSections()
     // scroll-view 内容渲染有延迟，延迟补测一次
     setTimeout(measureSections, 120)
+    // 拉取第二杯半价活动信息（用于商品角标）
+    void loadPromo()
   } catch (err) {
     error.value = err instanceof ApiError ? err.message : '菜单加载失败，请稍后重试'
   } finally {
@@ -241,6 +245,7 @@ const goCheckout = () => {
                 <text v-if="product.soldOut" class="prod__soldout">售罄</text>
                 <view v-else class="prod__add" @click="openSpec(product)">+</view>
               </view>
+              <text v-if="isPromoProduct(product.id)" class="prod__promo">第二杯半价</text>
             </view>
           </view>
           <view class="prods__footer">— 已经到底啦 —</view>
@@ -257,6 +262,7 @@ const goCheckout = () => {
         </view>
         <view class="spec__info">
           <text class="spec__name">{{ specProduct.name }}</text>
+          <text v-if="isPromoProduct(specProduct.id)" class="spec__promo">第二杯半价</text>
           <text class="spec__desc">{{ specProduct.description || specProduct.subtitle }}</text>
           <text class="spec__price">{{ formatMoney(specUnitPrice) }}</text>
         </view>
@@ -547,6 +553,29 @@ export default {
 
 .prod__action {
   flex: none;
+}
+
+.prod__promo {
+  position: absolute;
+  top: 0;
+  left: 0;
+  border-radius: $radius-sm 0 $radius-sm 0;
+  padding: 2rpx 12rpx;
+  background: linear-gradient(120deg, $caramel-500, $caramel-600);
+  color: #fff;
+  font-size: 18rpx;
+  letter-spacing: 1rpx;
+}
+
+.spec__promo {
+  display: inline-block;
+  margin-left: $space-2;
+  border-radius: $radius-full;
+  padding: 0 12rpx;
+  background: rgb(200 155 106 / 16%);
+  color: $color-accent-strong;
+  font-size: 18rpx;
+  vertical-align: middle;
 }
 
 .prod__soldout {

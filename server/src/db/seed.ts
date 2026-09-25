@@ -117,6 +117,14 @@ const PRODUCTS: ProductSeed[] = [
   { category: '周边', name: '会员徽章礼盒', subtitle: '礼盒', description: '山野三款金属徽章与烫金卡片，会员伴手礼。', base_price: 5600, sort: 6 },
 ]
 
+/**
+ * 第二杯半价活动种子数据：默认启用，适用咖啡类全部商品（商品 id 1-6）。
+ * 后台可在“活动管理”中修改时间与适用商品。
+ */
+const PROMO_START = '2026-09-01T00:00:00.000Z'
+const PROMO_END = '2026-12-31T23:59:59.000Z'
+const PROMO_PRODUCT_IDS = [1, 2, 3, 4, 5, 6]
+
 interface CouponSeed {
   name: string
   type: 'full_reduction' | 'discount'
@@ -251,6 +259,24 @@ export function seed(db: DatabaseSync): SeededCredential[] {
     '门店店员',
     createdAt,
   )
+
+  // 第二杯半价活动（默认启用，适用咖啡类商品）
+  const promoCount = db.prepare('SELECT COUNT(*) AS n FROM promo_activities').get() as { n: number }
+  if (promoCount.n === 0) {
+    const info = db
+      .prepare(
+        `INSERT INTO promo_activities (name, type, status, start_at, end_at, created_at)
+         VALUES ('第二杯半价', 'second_half', 'active', ?, ?, ?)`,
+      )
+      .run(PROMO_START, PROMO_END, createdAt)
+    const activityId = Number(info.lastInsertRowid)
+    const insertPromoProduct = db.prepare(
+      'INSERT OR REPLACE INTO promo_activity_products (activity_id, product_id) VALUES (?, ?)',
+    )
+    for (const productId of PROMO_PRODUCT_IDS) {
+      insertPromoProduct.run(activityId, productId)
+    }
+  }
 
   return credentials
 }

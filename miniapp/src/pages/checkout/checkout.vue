@@ -209,6 +209,10 @@ const submit = async () => {
           <text class="row__value">{{ formatMoney(quote.totalFen) }}</text>
         </view>
         <view class="row">
+          <text class="row__label">活动优惠（第二杯半价）</text>
+          <text class="row__value row__value--discount">-{{ formatMoney(quote.promoDiscountFen) }}</text>
+        </view>
+        <view class="row">
           <text class="row__label">优惠券减免</text>
           <text class="row__value row__value--discount">-{{ formatMoney(quote.discountFen) }}</text>
         </view>

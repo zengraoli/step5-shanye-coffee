@@ -4,10 +4,12 @@ import ProductCard from '@/components/ProductCard.vue'
 import SectionTitle from '@/components/SectionTitle.vue'
 import ProductArt from '@/components/ProductArt.vue'
 import { fetchCategories, fetchProducts, type Category, type Product } from '@/api/catalog'
+import { fetchPromo, type PromoActivity } from '@/api/promo'
 import { ApiError } from '@/api/client'
 
 const categories = ref<Category[]>([])
 const products = ref<Product[]>([])
+const promo = ref<PromoActivity | null>(null)
 const activeId = ref<number | 'all'>('all')
 const loading = ref(true)
 const error = ref('')
@@ -29,14 +31,19 @@ const activeCategory = computed(() =>
   categories.value.find((category) => category.id === activeId.value),
 )
 
+const isPromoProduct = (productId: number) => promo.value?.productIds.includes(productId) ?? false
+const promoCount = computed(() => promo.value?.productIds.length ?? 0)
+
 onMounted(async () => {
   try {
-    const [categoryList, productResult] = await Promise.all([
+    const [categoryList, productResult, promoState] = await Promise.all([
       fetchCategories(),
       fetchProducts({ pageSize: 60 }),
+      fetchPromo(),
     ])
     categories.value = categoryList
     products.value = productResult.list
+    promo.value = promoState.active ? promoState.activity : null
   } catch (err) {
     error.value = err instanceof ApiError ? err.message : '菜单加载失败，请稍后重试'
   } finally {
@@ -60,6 +67,16 @@ onMounted(async () => {
         <ProductArt category="咖啡" :size="140" class="menu-hero__art" />
       </div>
     </header>
+
+    <!-- 活动说明条 -->
+    <div v-if="promo" class="container">
+      <div class="promo-banner">
+        <span class="promo-banner__tag">第二杯半价</span>
+        <span class="promo-banner__text">
+          活动商品同单第 2、4… 杯半价，已覆盖 {{ promoCount }} 款商品；与优惠券叠加时先算活动价再用券。
+        </span>
+      </div>
+    </div>
 
     <div class="container menu-body">
       <!-- 分类切换 -->
@@ -89,7 +106,12 @@ onMounted(async () => {
         <SectionTitle v-else eyebrow="ALL" title="全部在售" desc="按分类排序，价格单位为元" />
 
         <div class="menu-grid">
-          <ProductCard v-for="product in visibleProducts" :key="product.id" :product="product" />
+          <ProductCard
+            v-for="product in visibleProducts"
+            :key="product.id"
+            :product="product"
+            :promo="isPromoProduct(product.id)"
+          />
         </div>
         <p v-if="visibleProducts.length === 0" class="menu-status">该分类暂无在售商品</p>
       </template>

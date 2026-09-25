@@ -59,6 +59,8 @@ export interface MemberOrder {
   items: MemberOrderItem[]
   totalFen: number
   discountFen: number
+  /** 第二杯半价活动优惠金额（分） */
+  promoDiscountFen: number
   payFen: number
   coupon: { id: number; name: string; discountFen: number } | null
   pickupCode: string | null

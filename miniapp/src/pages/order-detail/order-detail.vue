@@ -224,6 +224,10 @@ const confirm = async () => {
           <text class="row__value">{{ formatMoney(order.totalFen) }}</text>
         </view>
         <view class="row">
+          <text class="row__label">活动优惠（第二杯半价）</text>
+          <text class="row__value row__value--discount">-{{ formatMoney(order.promoDiscountFen) }}</text>
+        </view>
+        <view class="row">
           <text class="row__label">优惠券减免</text>
           <text class="row__value row__value--discount">-{{ formatMoney(order.discountFen) }}</text>
         </view>
