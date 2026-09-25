@@ -1,6 +1,7 @@
 import Fastify, { type FastifyInstance } from 'fastify'
 import cors from '@fastify/cors'
 import { errorHandlerPlugin, responsePlugin } from './plugins/core.js'
+import { registerRoutes } from './routes/index.js'
 import type { Db } from './db/index.js'
 
 export interface BuildAppOptions {
@@ -31,6 +32,8 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<FastifyIn
     service: 'shanye-coffee-server',
     time: new Date().toISOString(),
   }))
+
+  await registerRoutes(app)
 
   return app
 }

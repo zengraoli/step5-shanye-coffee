@@ -1,0 +1,172 @@
+import type { FastifyInstance } from 'fastify'
+import { fail } from '../lib/errors.js'
+import { sendOk } from '../lib/response.js'
+import { isValidPhone, maskPhone } from '../lib/phone.js'
+import { issueToken, revokeToken } from '../lib/token.js'
+import { adminGuard, adminOnly, memberGuard } from '../lib/guards.js'
+import { verifyPassword } from '../db/seed.js'
+
+/** 演示环境固定短信验证码 */
+export const DEMO_CODE = '123456'
+
+interface LoginBody {
+  phone?: unknown
+  code?: unknown
+}
+
+interface AdminLoginBody {
+  username?: unknown
+  password?: unknown
+}
+
+export async function authRoutes(app: FastifyInstance): Promise<void> {
+  const db = app.db
+
+  // ---------- 会员 ----------
+
+  app.post<{ Body: LoginBody }>('/api/v1/auth/sms-code', async (request, reply) => {
+    const { phone } = request.body ?? {}
+    if (!isValidPhone(phone)) {
+      fail('INVALID_PHONE')
+    }
+    return sendOk(reply, {
+      phone,
+      code: DEMO_CODE,
+      message: '演示环境验证码固定为 123456',
+    })
+  })
+
+  app.post<{ Body: LoginBody }>('/api/v1/auth/login', async (request, reply) => {
+    const { phone, code } = request.body ?? {}
+    if (!isValidPhone(phone)) {
+      fail('INVALID_PHONE')
+    }
+    if (code !== DEMO_CODE) {
+      fail('CODE_INVALID')
+    }
+    db.prepare(
+      `INSERT INTO members (phone, nickname, created_at) VALUES (?, ?, ?)
+       ON CONFLICT(phone) DO NOTHING`,
+    ).run(phone, `咖啡友${phone.slice(-4)}`, new Date().toISOString())
+    const member = db
+      .prepare('SELECT id, phone, nickname, points, level, created_at FROM members WHERE phone = ?')
+      .get(phone) as { id: number; phone: string; nickname: string; points: number; level: string; created_at: string }
+    const token = issueToken(db, 'member', member.id)
+    return sendOk(reply, {
+      token,
+      member: {
+        id: member.id,
+        phone: member.phone,
+        maskedPhone: maskPhone(member.phone),
+        nickname: member.nickname,
+        points: member.points,
+        level: member.level,
+        createdAt: member.created_at,
+      },
+    })
+  })
+
+  app.register(async (instance) => {
+    instance.addHook('preHandler', memberGuard(db))
+
+    instance.get('/api/v1/members/me', async (request, reply) => {
+      const member = request.member!
+      return sendOk(reply, {
+        id: member.id,
+        phone: member.phone,
+        maskedPhone: maskPhone(member.phone),
+        nickname: member.nickname,
+        points: member.points,
+        level: member.level,
+      })
+    })
+
+    instance.post('/api/v1/auth/logout', async (request, reply) => {
+      const header = request.headers.authorization
+      if (typeof header === 'string' && header.startsWith('Bearer ')) {
+        revokeToken(db, header.slice(7).trim())
+      }
+      return sendOk(reply, { loggedOut: true })
+    })
+  })
+
+  // ---------- 后台 ----------
+
+  app.post<{ Body: AdminLoginBody }>('/api/v1/admin/auth/login', async (request, reply) => {
+    const { username, password } = request.body ?? {}
+    if (typeof username !== 'string' || typeof password !== 'string' || username.length === 0 || password.length === 0) {
+      fail('BAD_REQUEST', '请输入账号和密码')
+    }
+    const row = db
+      .prepare('SELECT id, username, password_hash, salt, role, store_id, nickname, status FROM admin_users WHERE username = ?')
+      .get(username) as
+      | { id: number; username: string; password_hash: string; salt: string; role: string; store_id: number | null; nickname: string; status: string }
+      | undefined
+    if (!row || row.status !== 'active') {
+      fail('LOGIN_FAILED')
+    }
+    if (!verifyPassword(password, row.salt, row.password_hash)) {
+      fail('LOGIN_FAILED')
+    }
+    const token = issueToken(db, 'admin', row.id)
+    return sendOk(reply, {
+      token,
+      admin: {
+        id: row.id,
+        username: row.username,
+        role: row.role,
+        storeId: row.store_id,
+        nickname: row.nickname,
+      },
+    })
+  })
+
+  app.register(async (instance) => {
+    instance.addHook('preHandler', adminGuard(db))
+
+    instance.get('/api/v1/admin/auth/me', async (request, reply) => {
+      const admin = request.admin!
+      return sendOk(reply, {
+        id: admin.id,
+        username: admin.username,
+        role: admin.role,
+        storeId: admin.storeId,
+        nickname: admin.nickname,
+      })
+    })
+
+    instance.post('/api/v1/admin/auth/logout', async (request, reply) => {
+      const header = request.headers.authorization
+      if (typeof header === 'string' && header.startsWith('Bearer ')) {
+        revokeToken(db, header.slice(7).trim())
+      }
+      return sendOk(reply, { loggedOut: true })
+    })
+
+    // 后台账号列表：仅管理员可见（店员访问返回 403）
+    instance.register(async (adminScope) => {
+      adminScope.addHook('preHandler', adminOnly())
+      adminScope.get('/api/v1/admin/accounts', async (request, reply) => {
+        const rows = db
+          .prepare(
+            `SELECT a.id, a.username, a.role, a.store_id, a.nickname, a.status, s.name AS store_name
+             FROM admin_users a LEFT JOIN stores s ON s.id = a.store_id
+             ORDER BY a.id`,
+          )
+          .all() as { id: number; username: string; role: string; store_id: number | null; nickname: string; status: string; store_name: string | null }[]
+        return sendOk(
+          reply,
+          rows.map((row) => ({
+            id: row.id,
+            username: row.username,
+            role: row.role,
+            storeId: row.store_id,
+            storeName: row.store_name,
+            nickname: row.nickname,
+            status: row.status,
+          })),
+        )
+      })
+    })
+  })
+}
