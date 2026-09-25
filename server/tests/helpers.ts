@@ -33,6 +33,11 @@ export async function loginMember(app: FastifyInstance, phone: string): Promise<
   return (res.json().data as { token: string }).token
 }
 
+/** 强制门店处于营业状态（消除测试对当前时间的依赖） */
+export function forceStoreOpen(db: TestContext['db'], storeId: number): void {
+  db.prepare('UPDATE stores SET open_time = ?, close_time = ? WHERE id = ?').run('00:00', '23:59', storeId)
+}
+
 export async function loginAdmin(
   app: FastifyInstance,
   username: 'admin' | 'staff' = 'admin',
