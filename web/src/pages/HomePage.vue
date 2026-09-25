@@ -169,6 +169,21 @@ onMounted(async () => {
   padding-block: var(--space-8) var(--space-7);
 }
 
+/* 文字区柔光：保证任何宽度下文字都与插画有足够对比 */
+.hero__content::before {
+  content: '';
+  position: absolute;
+  inset: calc(var(--space-6) * -1) calc(var(--space-7) * -1) calc(var(--space-5) * -1);
+  z-index: -1;
+  background: radial-gradient(
+    130% 105% at 18% 82%,
+    rgb(250 246 239 / 94%) 0%,
+    rgb(250 246 239 / 72%) 52%,
+    rgb(250 246 239 / 0%) 82%
+  );
+  pointer-events: none;
+}
+
 .hero__eyebrow,
 .hero__content > .hero__eyebrow {
   font-size: var(--text-xs);

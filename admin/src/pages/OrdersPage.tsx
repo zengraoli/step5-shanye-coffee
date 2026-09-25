@@ -94,8 +94,8 @@ export function OrdersPage() {
         page,
         pageSize,
       })
-      setOrders(result.list)
-      setTotal(result.total)
+      setOrders(Array.isArray(result.list) ? result.list : [])
+      setTotal(result.total ?? 0)
     } catch (err) {
       setError(err instanceof ApiError ? err.message : '加载失败，请稍后重试')
     } finally {

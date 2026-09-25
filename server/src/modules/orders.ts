@@ -503,9 +503,8 @@ export async function orderRoutes(app: FastifyInstance): Promise<void> {
         member_nickname: string
         store_name: string
       })[]
-      return sendOk(
-        reply,
-        rows.map((row) => ({
+      return sendOk(reply, {
+        list: rows.map((row) => ({
           id: row.id,
           orderNo: row.order_no,
           storeId: row.store_id,
@@ -525,7 +524,10 @@ export async function orderRoutes(app: FastifyInstance): Promise<void> {
           createdAt: row.created_at,
           paidAt: row.paid_at,
         })),
-      )
+        total: totalRow.n,
+        page,
+        pageSize,
+      })
     })
 
     instance.get<{ Params: { id: string } }>('/api/v1/admin/orders/:id', { schema: { tags: ['admin', 'orders'], summary: '后台订单详情', security: [{ adminBearer: [] }] } }, async (request, reply) => {

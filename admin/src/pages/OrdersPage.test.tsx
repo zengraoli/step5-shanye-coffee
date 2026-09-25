@@ -201,6 +201,29 @@ describe('OrdersPage', () => {
     expect(listCall?.url).toContain('page=1')
   })
 
+  test('接口返回结构异常时降级为空列表，不白屏', async () => {
+    // 模拟旧版接口直接返回数组（缺少 list/total 字段）
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () =>
+        new Response(JSON.stringify({ code: 0, data: [], message: 'ok' }), {
+          headers: { 'content-type': 'application/json' },
+        }),
+      ),
+    )
+    seedSession()
+    render(
+      <MemoryRouter>
+        <AuthProvider>
+          <OrdersPage />
+        </AuthProvider>
+      </MemoryRouter>,
+    )
+    // 页面正常渲染出空态，而不是崩溃
+    expect(await screen.findByText('没有符合条件的订单')).toBeInTheDocument()
+    expect(screen.queryByLabelText('门店')).toBeInTheDocument()
+  })
+
   test('接口错误时展示重试', async () => {
     vi.stubGlobal(
       'fetch',

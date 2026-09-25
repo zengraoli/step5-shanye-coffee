@@ -333,7 +333,8 @@ test('店员只能操作本门店订单', async () => {
       url: '/api/v1/admin/orders',
       headers: { authorization: `Bearer ${staffToken}` },
     })
-    assert.equal(staffList.json().data.length, 0)
+    assert.equal(staffList.json().data.list.length, 0)
+    assert.equal(staffList.json().data.total, 0)
 
     // 管理员可以操作
     const allowed = await app.inject({
@@ -363,7 +364,18 @@ test('后台订单列表：筛选、手机号脱敏、详情', async () => {
       headers: { authorization: `Bearer ${adminToken}` },
     })
     assert.equal(list.statusCode, 200)
-    const rows = list.json().data as { id: number; memberPhone: string; status: string }[]
+    const payload = list.json().data as {
+      list: { id: number; memberPhone: string; status: string }[]
+      total: number
+      page: number
+      pageSize: number
+    }
+    // 列表为分页结构 { list, total, page, pageSize }
+    assert.ok(Array.isArray(payload.list))
+    assert.equal(payload.total, 2)
+    assert.equal(payload.page, 1)
+    assert.equal(payload.pageSize, 20)
+    const rows = payload.list
     assert.equal(rows.length, 2)
     for (const row of rows) {
       assert.match(row.memberPhone, /^1\d{2}\*\*\*\*\d{4}$/)
@@ -374,14 +386,25 @@ test('后台订单列表：筛选、手机号脱敏、详情', async () => {
       url: '/api/v1/admin/orders?status=pending_pay',
       headers: { authorization: `Bearer ${adminToken}` },
     })
-    assert.equal(byStatus.json().data.length, 2)
+    assert.equal(byStatus.json().data.list.length, 2)
+    assert.equal(byStatus.json().data.total, 2)
 
     const byStore = await app.inject({
       method: 'GET',
       url: '/api/v1/admin/orders?store_id=2',
       headers: { authorization: `Bearer ${adminToken}` },
     })
-    assert.equal(byStore.json().data.length, 0)
+    assert.equal(byStore.json().data.list.length, 0)
+    assert.equal(byStore.json().data.total, 0)
+
+    const paged = await app.inject({
+      method: 'GET',
+      url: '/api/v1/admin/orders?page=1&page_size=1',
+      headers: { authorization: `Bearer ${adminToken}` },
+    })
+    assert.equal(paged.json().data.list.length, 1)
+    assert.equal(paged.json().data.total, 2)
+    assert.equal(paged.json().data.pageSize, 1)
 
     const detail = await app.inject({
       method: 'GET',

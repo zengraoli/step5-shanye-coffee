@@ -1,7 +1,8 @@
 <script setup lang="ts">
 /**
- * 品牌主视觉插画：山野日出 + 一杯咖啡。
- * 纯自绘 SVG（分层山峦、太阳、咖啡杯、热气、飞鸟），无外部资源。
+ * 品牌主视觉插画：山野日出 + 山脊上的咖啡杯。
+ * 纯自绘 SVG；上中部为天空与山峦，下三分之一为浅色前景，
+ * 保证首屏文字（深色）始终落在浅色区域上，任何宽度都清晰可读。
  */
 </script>
 
@@ -16,26 +17,26 @@
     >
       <defs>
         <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stop-color="#f7ead6" />
-          <stop offset="55%" stop-color="#f3dfc4" />
-          <stop offset="100%" stop-color="#efd3b4" />
+          <stop offset="0%" stop-color="#f9eeddff" />
+          <stop offset="60%" stop-color="#f6e6d0" />
+          <stop offset="100%" stop-color="#f3dfc4" />
         </linearGradient>
         <radialGradient id="sunGlow" cx="0.5" cy="0.5" r="0.5">
-          <stop offset="0%" stop-color="#e8b87d" stop-opacity="0.95" />
-          <stop offset="60%" stop-color="#e8b87d" stop-opacity="0.25" />
+          <stop offset="0%" stop-color="#e8b87d" stop-opacity="0.9" />
+          <stop offset="55%" stop-color="#e8b87d" stop-opacity="0.22" />
           <stop offset="100%" stop-color="#e8b87d" stop-opacity="0" />
         </radialGradient>
         <linearGradient id="farHill" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stop-color="#c9a986" />
-          <stop offset="100%" stop-color="#b08e6c" />
+          <stop offset="0%" stop-color="#dcc0a0" />
+          <stop offset="100%" stop-color="#cbb392" />
         </linearGradient>
         <linearGradient id="midHill" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stop-color="#8a6a4d" />
-          <stop offset="100%" stop-color="#6b4f3a" />
+          <stop offset="0%" stop-color="#b8946f" />
+          <stop offset="100%" stop-color="#a3815f" />
         </linearGradient>
-        <linearGradient id="nearHill" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stop-color="#4a3728" />
-          <stop offset="100%" stop-color="#33261c" />
+        <linearGradient id="foreground" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="#f5eee2" />
+          <stop offset="100%" stop-color="#ecdfcb" />
         </linearGradient>
       </defs>
 
@@ -43,48 +44,57 @@
       <rect width="1200" height="620" fill="url(#sky)" />
 
       <!-- 太阳与光晕 -->
-      <circle cx="860" cy="200" r="190" fill="url(#sunGlow)" />
-      <circle cx="860" cy="200" r="72" fill="#e8b87d" />
-      <circle cx="860" cy="200" r="72" stroke="#c89b6a" stroke-width="3" opacity="0.5" />
+      <circle cx="920" cy="120" r="180" fill="url(#sunGlow)" />
+      <circle cx="920" cy="120" r="58" fill="#e8b87d" />
+      <circle cx="920" cy="120" r="58" stroke="#c89b6a" stroke-width="3" opacity="0.45" />
 
       <!-- 飞鸟 -->
-      <path d="M240 150c8-8 14-8 20 0 6-8 12-8 20 0" stroke="#6b4f3a" stroke-width="3" stroke-linecap="round" opacity="0.7" />
-      <path d="M300 190c6-6 10-6 15 0 5-6 9-6 15 0" stroke="#6b4f3a" stroke-width="2.4" stroke-linecap="round" opacity="0.5" />
+      <path d="M210 120c8-8 14-8 20 0 6-8 12-8 20 0" stroke="#8a6a4d" stroke-width="3" stroke-linecap="round" opacity="0.65" />
+      <path d="M270 156c6-6 10-6 15 0 5-6 9-6 15 0" stroke="#8a6a4d" stroke-width="2.4" stroke-linecap="round" opacity="0.45" />
 
       <!-- 远山 -->
-      <path d="M0 380L180 220l160 130L420 180l220 200 180-120 380 180v140H0V380z" fill="url(#farHill)" opacity="0.85" />
+      <path d="M0 330L170 190l150 120 130-110 190 170 150-110 410 170v90H0V330z" fill="url(#farHill)" opacity="0.9" />
       <!-- 中山 -->
-      <path d="M0 470L220 300l200 150L560 260l260 210 180-90 200 130v90H0v-230z" fill="url(#midHill)" opacity="0.92" />
-      <!-- 近山 -->
-      <path d="M0 620V540l260-170 220 140 260-190 460 220v80H0z" fill="url(#nearHill)" />
+      <path d="M0 430L230 280l190 130 180-120 220 160 180-90 200 110v70H0V430z" fill="url(#midHill)" opacity="0.95" />
 
-      <!-- 咖啡园梯田线条 -->
-      <path d="M120 560c120-40 260-40 380 0s260 40 380 0" stroke="#c89b6a" stroke-width="3" opacity="0.35" stroke-linecap="round" />
-      <path d="M180 596c120-34 240-34 360 0s240 34 360 0" stroke="#c89b6a" stroke-width="3" opacity="0.22" stroke-linecap="round" />
-
-      <!-- 前景咖啡杯 -->
-      <g transform="translate(470 372)">
-        <ellipse cx="130" cy="212" rx="120" ry="18" fill="#33261c" opacity="0.35" />
-        <path d="M52 76h156v66a66 66 0 0 1-66 66h-24a66 66 0 0 1-66-66V76z" fill="#faf6ef" stroke="#33261c" stroke-width="4" />
-        <path d="M52 76h156" stroke="#33261c" stroke-width="4" stroke-linecap="round" />
-        <path d="M208 88h22a30 30 0 0 1 0 60h-16" stroke="#33261c" stroke-width="4" stroke-linecap="round" />
-        <!-- 杯口咖啡液 -->
-        <ellipse cx="130" cy="78" rx="78" ry="12" fill="#6b4f3a" />
-        <ellipse cx="130" cy="76" rx="60" ry="8" fill="#4a3728" opacity="0.6" />
+      <!-- 山脊上的咖啡杯（右侧，不与左侧文字重叠） -->
+      <g transform="translate(772 214)">
+        <ellipse cx="108" cy="212" rx="104" ry="16" fill="#8a6a4d" opacity="0.28" />
+        <path d="M40 82h136v58a58 58 0 0 1-58 58h-20a58 58 0 0 1-58-58v-58z" fill="#fffdf9" stroke="#4a3728" stroke-width="4" />
+        <path d="M40 82h136" stroke="#4a3728" stroke-width="4" stroke-linecap="round" />
+        <path d="M176 92h18a26 26 0 0 1 0 52h-12" stroke="#4a3728" stroke-width="4" stroke-linecap="round" />
+        <ellipse cx="108" cy="84" rx="68" ry="10" fill="#6b4f3a" />
+        <ellipse cx="108" cy="82" rx="50" ry="7" fill="#4a3728" opacity="0.55" />
         <!-- 热气（CSS 动画） -->
-        <g class="hero-art__steam" stroke="#faf6ef" stroke-width="5" stroke-linecap="round" opacity="0.9">
-          <path d="M96 56c10-10 0-22 0-34" />
-          <path d="M130 48c12-12 0-26 0-40" />
-          <path d="M164 56c10-10 0-22 0-34" />
+        <g class="hero-art__steam" stroke="#fffdf9" stroke-width="5" stroke-linecap="round" opacity="0.95">
+          <path d="M78 62c10-10 0-22 0-34" />
+          <path d="M108 54c12-12 0-26 0-40" />
+          <path d="M138 62c10-10 0-22 0-34" />
         </g>
       </g>
 
-      <!-- 咖啡豆散落 -->
-      <g opacity="0.9">
-        <ellipse cx="380" cy="520" rx="14" ry="10" fill="#33261c" transform="rotate(-16 380 520)" />
-        <path d="M374 520c4-4 8-4 12 0" stroke="#faf6ef" stroke-width="2" stroke-linecap="round" />
-        <ellipse cx="830" cy="548" rx="14" ry="10" fill="#33261c" transform="rotate(12 830 548)" />
-        <path d="M824 548c4-4 8-4 12 0" stroke="#faf6ef" stroke-width="2" stroke-linecap="round" />
+      <!-- 浅色前景（文字区） -->
+      <path d="M0 620V470c180-34 340-34 520 0s340 34 680 0v150H0z" fill="url(#foreground)" />
+      <!-- 田埂弧线 -->
+      <path d="M0 486c180-30 340-30 520 0s340 30 680 0" stroke="#dccfba" stroke-width="3" opacity="0.9" stroke-linecap="round" />
+      <path d="M0 528c200-28 360-28 560 0s300 28 640 0" stroke="#dccfba" stroke-width="3" opacity="0.65" stroke-linecap="round" />
+      <path d="M0 578c220-26 380-26 600 0s280 26 620 0" stroke="#dccfba" stroke-width="3" opacity="0.45" stroke-linecap="round" />
+
+      <!-- 前景咖啡豆与枝叶 -->
+      <g opacity="0.95">
+        <ellipse cx="180" cy="512" rx="15" ry="10" fill="#4a3728" transform="rotate(-16 180 512)" />
+        <path d="M174 512c4-4 8-4 12 0" stroke="#faf6ef" stroke-width="2" stroke-linecap="round" />
+        <ellipse cx="1030" cy="540" rx="15" ry="10" fill="#4a3728" transform="rotate(12 1030 540)" />
+        <path d="M1024 540c4-4 8-4 12 0" stroke="#faf6ef" stroke-width="2" stroke-linecap="round" />
+        <ellipse cx="640" cy="588" rx="13" ry="9" fill="#6b4f3a" transform="rotate(-8 640 588)" />
+        <path d="M635 588c3-3 7-3 10 0" stroke="#faf6ef" stroke-width="1.8" stroke-linecap="round" />
+      </g>
+      <g transform="translate(1130 452)">
+        <path d="M0 40V8" stroke="#5f7d4f" stroke-width="3.4" stroke-linecap="round" />
+        <path d="M0 26c-14-5-22-16-24-30 13 2 23 10 25 21M0 20c14-6 21-17 23-31-13 3-21 11-23 23"
+          stroke="#5f7d4f" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round" />
+        <circle cx="-24" cy="0" r="5.6" fill="#b4442f" />
+        <circle cx="23" cy="-11" r="5.6" fill="#b4442f" />
       </g>
     </svg>
   </div>
