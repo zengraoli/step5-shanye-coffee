@@ -3,6 +3,7 @@ import { AuthProvider } from '@/auth/AuthContext'
 import { RequireAuth } from '@/auth/RequireAuth'
 import { AppLayout } from '@/components/app/AppLayout'
 import { DashboardPage } from '@/pages/DashboardPage'
+import { OrdersPage } from '@/pages/OrdersPage'
 import { ProductsPage } from '@/pages/ProductsPage'
 import { LoginPage } from '@/pages/LoginPage'
 import { PlaceholderPage } from '@/pages/PlaceholderPage'
@@ -23,7 +24,7 @@ export default function App() {
         >
           <Route index element={<Navigate to="/dashboard" replace />} />
           <Route path="/dashboard" element={<DashboardPage />} />
-          <Route path="/orders" element={<PlaceholderPage />} />
+          <Route path="/orders" element={<OrdersPage />} />
           <Route path="/products" element={<ProductsPage />} />
           <Route path="/stores" element={<PlaceholderPage />} />
           <Route path="/members" element={<PlaceholderPage />} />

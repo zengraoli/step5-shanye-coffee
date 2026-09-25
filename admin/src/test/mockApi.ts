@@ -1,6 +1,8 @@
 import { vi } from 'vitest'
 import type { AdminProfile } from '@/api/client'
 
+export type AdminProfileLike = AdminProfile
+
 export const ADMIN_PROFILE: AdminProfile = {
   id: 1,
   username: 'admin',
