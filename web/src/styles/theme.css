@@ -1,0 +1,97 @@
+/* ============================================================
+   山野咖啡 · 品牌主题变量（web 端主题文件）
+   三端（admin / web / miniapp）共用同一套品牌视觉：
+   主色深山棕、点缀焦糖、辅助抹茶、底色米白。
+   ============================================================ */
+
+:root {
+  /* ---- 品牌色板 ---- */
+  --brand-900: #2b2118; /* 墨咖（标题 / 深色底） */
+  --brand-700: #4a3728; /* 深山棕（主色） */
+  --brand-500: #6b4f3a; /* 焙棕（次级强调） */
+  --brand-300: #a68a6d; /* 浅焙（弱化文字 / 边框） */
+  --caramel-600: #b07f4a; /* 深焦糖 */
+  --caramel-500: #c89b6a; /* 焦糖（点缀） */
+  --caramel-300: #e8c9a0; /* 浅焦糖 */
+  --matcha-600: #5f7d4f; /* 深抹茶 */
+  --matcha-500: #7d9b6a; /* 抹茶（辅助） */
+  --cream-50: #faf6ef; /* 米白（页面底色） */
+  --cream-100: #f3ece0; /* 燕麦奶（卡片底） */
+  --cream-200: #e9dfd0; /* 奶泡（分隔线） */
+  --paper: #fffdf9; /* 纸白（卡片表面） */
+
+  /* ---- 语义变量 ---- */
+  --color-bg: var(--cream-50);
+  --color-surface: var(--paper);
+  --color-surface-muted: var(--cream-100);
+  --color-text: var(--brand-900);
+  --color-text-soft: #6f6255;
+  --color-text-faint: #9a8d7d;
+  --color-primary: var(--brand-700);
+  --color-primary-strong: var(--brand-900);
+  --color-accent: var(--caramel-500);
+  --color-accent-strong: var(--caramel-600);
+  --color-success: var(--matcha-600);
+  --color-line: var(--cream-200);
+  --color-line-strong: #dccfba;
+
+  /* ---- 字体层级 ---- */
+  --font-display: 'Songti SC', 'Noto Serif SC', 'Source Han Serif SC', 'SimSun', Georgia, serif;
+  --font-body: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei',
+    'Segoe UI', Roboto, sans-serif;
+
+  --text-xs: 0.75rem;
+  --text-sm: 0.875rem;
+  --text-base: 1rem;
+  --text-lg: 1.125rem;
+  --text-xl: 1.375rem;
+  --text-2xl: 1.75rem;
+  --text-3xl: 2.25rem;
+  --text-4xl: 3rem;
+
+  /* ---- 圆角 ---- */
+  --radius-sm: 8px;
+  --radius-md: 14px;
+  --radius-lg: 22px;
+  --radius-xl: 32px;
+  --radius-full: 999px;
+
+  /* ---- 间距 ---- */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  --space-7: 48px;
+  --space-8: 64px;
+  --space-9: 96px;
+
+  /* ---- 阴影 ---- */
+  --shadow-sm: 0 1px 2px rgb(43 33 24 / 6%), 0 2px 8px rgb(43 33 24 / 4%);
+  --shadow-md: 0 2px 6px rgb(43 33 24 / 8%), 0 8px 24px rgb(43 33 24 / 6%);
+  --shadow-lg: 0 4px 12px rgb(43 33 24 / 10%), 0 16px 48px rgb(43 33 24 / 10%);
+
+  /* ---- 布局 ---- */
+  --container-max: 1200px;
+  --header-height: 64px;
+  --footer-bg: var(--brand-900);
+}
+
+/* 平板 */
+@media (max-width: 1024px) {
+  :root {
+    --text-4xl: 2.5rem;
+    --text-3xl: 2rem;
+  }
+}
+
+/* 手机 */
+@media (max-width: 640px) {
+  :root {
+    --text-4xl: 2rem;
+    --text-3xl: 1.625rem;
+    --text-2xl: 1.375rem;
+    --header-height: 56px;
+  }
+}
