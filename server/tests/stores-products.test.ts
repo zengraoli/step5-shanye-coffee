@@ -116,13 +116,14 @@ test('下架商品在用户端列表消失、详情报错', async () => {
     assert.equal(detail.statusCode, 400)
     assert.equal(detail.json().code, 30002)
 
-    // 后台仍能看到下架商品
+    // 后台仍能看到下架商品（分页结构）
     const adminList = await app.inject({
       method: 'GET',
-      url: '/api/v1/admin/products',
+      url: '/api/v1/admin/products?page=1&page_size=50',
       headers: { authorization: `Bearer ${adminToken}` },
     })
-    assert.equal(adminList.json().data.length, 24)
+    assert.equal(adminList.json().data.total, 24)
+    assert.equal(adminList.json().data.list.length, 24)
   } finally {
     await app.close()
   }

@@ -137,8 +137,8 @@ export async function productRoutes(app: FastifyInstance): Promise<void> {
   app.register(async (instance) => {
     instance.addHook('preHandler', adminGuard(db))
 
-    instance.get('/api/v1/admin/products', { schema: { tags: ['admin', 'products'], summary: '后台商品列表（含下架商品）', security: [{ adminBearer: [] }] } }, async (request, reply) => {
-      const query = request.query as { category_id?: string; keyword?: string; on_sale?: string; sold_out?: string }
+    instance.get('/api/v1/admin/products', { schema: { tags: ['admin', 'products'], summary: '后台商品列表（含下架商品，可分页筛选）', security: [{ adminBearer: [] }] } }, async (request, reply) => {
+      const query = request.query as { category_id?: string; keyword?: string; on_sale?: string; sold_out?: string; page?: string; page_size?: string }
       const conditions: string[] = []
       const params: (string | number)[] = []
       if (query.category_id !== undefined && query.category_id !== '') {
@@ -162,13 +162,23 @@ export async function productRoutes(app: FastifyInstance): Promise<void> {
         params.push(Number(query.sold_out))
       }
       const where = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : ''
+      const page = Math.max(1, toInt(query.page, 1))
+      const pageSize = Math.min(100, Math.max(1, toInt(query.page_size, 20)))
+      const totalRow = db
+        .prepare(`SELECT COUNT(*) AS n FROM products p ${where}`)
+        .get(...params) as unknown as { n: number }
       const rows = db
         .prepare(
           `SELECT p.*, c.name AS category_name FROM products p
-           LEFT JOIN categories c ON c.id = p.category_id ${where} ORDER BY p.sort, p.id`,
+           LEFT JOIN categories c ON c.id = p.category_id ${where} ORDER BY p.sort, p.id LIMIT ? OFFSET ?`,
         )
-        .all(...params) as unknown as (ProductRow & { category_name: string | null })[]
-      return sendOk(reply, rows.map((row) => serializeProduct(row, row.category_name ?? '')))
+        .all(...params, pageSize, (page - 1) * pageSize) as unknown as (ProductRow & { category_name: string | null })[]
+      return sendOk(reply, {
+        list: rows.map((row) => serializeProduct(row, row.category_name ?? '')),
+        total: totalRow.n,
+        page,
+        pageSize,
+      })
     })
 
     // 上架 / 下架：仅管理员
