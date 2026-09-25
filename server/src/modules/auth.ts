@@ -1,10 +1,11 @@
 import type { FastifyInstance } from 'fastify'
 import { fail } from '../lib/errors.js'
 import { sendOk } from '../lib/response.js'
-import { isValidPhone, maskPhone } from '../lib/phone.js'
+import { isValidPhone } from '../lib/phone.js'
 import { issueToken, revokeToken } from '../lib/token.js'
 import { adminGuard, adminOnly, memberGuard } from '../lib/guards.js'
 import { verifyPassword } from '../db/seed.js'
+import { serializeMember } from './points.js'
 
 /** 演示环境固定短信验证码 */
 export const DEMO_CODE = '123456'
@@ -52,33 +53,18 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
       .prepare('SELECT id, phone, nickname, points, level, created_at FROM members WHERE phone = ?')
       .get(phone) as { id: number; phone: string; nickname: string; points: number; level: string; created_at: string }
     const token = issueToken(db, 'member', member.id)
-    return sendOk(reply, {
-      token,
-      member: {
-        id: member.id,
-        phone: member.phone,
-        maskedPhone: maskPhone(member.phone),
-        nickname: member.nickname,
-        points: member.points,
-        level: member.level,
-        createdAt: member.created_at,
-      },
-    })
+    return sendOk(reply, { token, member: serializeMember(db, member) })
   })
 
   app.register(async (instance) => {
     instance.addHook('preHandler', memberGuard(db))
 
     instance.get('/api/v1/members/me', async (request, reply) => {
-      const member = request.member!
-      return sendOk(reply, {
-        id: member.id,
-        phone: member.phone,
-        maskedPhone: maskPhone(member.phone),
-        nickname: member.nickname,
-        points: member.points,
-        level: member.level,
-      })
+      const session = request.member!
+      const member = db
+        .prepare('SELECT id, phone, nickname, points, level, created_at FROM members WHERE id = ?')
+        .get(session.id) as { id: number; phone: string; nickname: string; points: number; level: string; created_at: string }
+      return sendOk(reply, serializeMember(db, member))
     })
 
     instance.post('/api/v1/auth/logout', async (request, reply) => {

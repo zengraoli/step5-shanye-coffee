@@ -15,6 +15,7 @@ import {
   type OrderStatus,
 } from '../lib/order-status.js'
 import { priceCart, type CartItemInput } from './pricing.js'
+import { grantPointsForOrder } from './points.js'
 import { withTransaction } from '../db/tx.js'
 import { maskPhone } from '../lib/phone.js'
 
@@ -370,6 +371,8 @@ export async function orderRoutes(app: FastifyInstance): Promise<void> {
             `UPDATE member_coupons SET status = 'used', used_at = ? WHERE id = ? AND status = 'unused'`,
           ).run(now, order.member_coupon_id)
         }
+        // 支付后按实付金额发放积分并自动升级等级
+        grantPointsForOrder(db, member.id, id, order.pay_fen)
       })
       const updated = db.prepare('SELECT * FROM orders WHERE id = ?').get(id) as unknown as OrderRow
       return sendOk(reply, serializeOrder(db, updated))
