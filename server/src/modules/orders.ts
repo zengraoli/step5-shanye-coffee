@@ -200,7 +200,7 @@ export async function orderRoutes(app: FastifyInstance): Promise<void> {
     instance.addHook('preHandler', memberGuard(db))
 
     // 创建订单
-    instance.post<{ Body: CreateOrderBody }>('/api/v1/orders', async (request, reply) => {
+    instance.post<{ Body: CreateOrderBody }>('/api/v1/orders', { schema: { tags: ['orders', 'members'], summary: '创建订单（自提 / 堂食）', security: [{ memberBearer: [] }] } }, async (request, reply) => {
       const member = request.member!
       const body = request.body ?? {}
       const storeId = Number(body.storeId)
@@ -298,6 +298,7 @@ export async function orderRoutes(app: FastifyInstance): Promise<void> {
     // 我的订单列表
     instance.get<{ Querystring: { status?: string; page?: string; page_size?: string } }>(
       '/api/v1/orders',
+      { schema: { tags: ['orders', 'members'], summary: '我的订单列表', security: [{ memberBearer: [] }] } },
       async (request, reply) => {
         const member = request.member!
         const conditions = ['member_id = ?']
@@ -327,7 +328,7 @@ export async function orderRoutes(app: FastifyInstance): Promise<void> {
     )
 
     // 订单详情（仅本人）
-    instance.get<{ Params: { id: string } }>('/api/v1/orders/:id', async (request, reply) => {
+    instance.get<{ Params: { id: string } }>('/api/v1/orders/:id', { schema: { tags: ['orders', 'members'], summary: '订单详情（仅本人）', security: [{ memberBearer: [] }] } }, async (request, reply) => {
       const member = request.member!
       const id = Number(request.params.id)
       if (!Number.isInteger(id) || id <= 0) {
@@ -344,7 +345,7 @@ export async function orderRoutes(app: FastifyInstance): Promise<void> {
     })
 
     // 模拟支付
-    instance.post<{ Params: { id: string } }>('/api/v1/orders/:id/pay', async (request, reply) => {
+    instance.post<{ Params: { id: string } }>('/api/v1/orders/:id/pay', { schema: { tags: ['orders', 'members'], summary: '模拟支付（生成取餐码并发放积分）', security: [{ memberBearer: [] }] } }, async (request, reply) => {
       const member = request.member!
       const id = Number(request.params.id)
       if (!Number.isInteger(id) || id <= 0) {
@@ -379,7 +380,7 @@ export async function orderRoutes(app: FastifyInstance): Promise<void> {
     })
 
     // 取消订单（支付前）
-    instance.post<{ Params: { id: string } }>('/api/v1/orders/:id/cancel', async (request, reply) => {
+    instance.post<{ Params: { id: string } }>('/api/v1/orders/:id/cancel', { schema: { tags: ['orders', 'members'], summary: '取消订单（支付前）', security: [{ memberBearer: [] }] } }, async (request, reply) => {
       const member = request.member!
       const id = Number(request.params.id)
       if (!Number.isInteger(id) || id <= 0) {
@@ -404,7 +405,7 @@ export async function orderRoutes(app: FastifyInstance): Promise<void> {
     })
 
     // 会员确认取餐（待取餐 → 已完成）
-    instance.post<{ Params: { id: string } }>('/api/v1/orders/:id/confirm', async (request, reply) => {
+    instance.post<{ Params: { id: string } }>('/api/v1/orders/:id/confirm', { schema: { tags: ['orders', 'members'], summary: '确认取餐', security: [{ memberBearer: [] }] } }, async (request, reply) => {
       const member = request.member!
       const id = Number(request.params.id)
       if (!Number.isInteger(id) || id <= 0) {
@@ -434,7 +435,7 @@ export async function orderRoutes(app: FastifyInstance): Promise<void> {
   app.register(async (instance) => {
     instance.addHook('preHandler', adminGuard(db))
 
-    instance.get('/api/v1/admin/orders', async (request, reply) => {
+    instance.get('/api/v1/admin/orders', { schema: { tags: ['admin', 'orders'], summary: '后台订单列表（店员仅本门店）', security: [{ adminBearer: [] }] } }, async (request, reply) => {
       const admin = request.admin!
       const query = request.query as {
         store_id?: string
@@ -526,7 +527,7 @@ export async function orderRoutes(app: FastifyInstance): Promise<void> {
       )
     })
 
-    instance.get<{ Params: { id: string } }>('/api/v1/admin/orders/:id', async (request, reply) => {
+    instance.get<{ Params: { id: string } }>('/api/v1/admin/orders/:id', { schema: { tags: ['admin', 'orders'], summary: '后台订单详情', security: [{ adminBearer: [] }] } }, async (request, reply) => {
       const admin = request.admin!
       const id = Number(request.params.id)
       if (!Number.isInteger(id) || id <= 0) {
@@ -551,7 +552,7 @@ export async function orderRoutes(app: FastifyInstance): Promise<void> {
     })
 
     // 推进订单状态
-    instance.post<{ Params: { id: string } }>('/api/v1/admin/orders/:id/advance', async (request, reply) => {
+    instance.post<{ Params: { id: string } }>('/api/v1/admin/orders/:id/advance', { schema: { tags: ['admin', 'orders'], summary: '推进订单状态（店员仅本门店）', security: [{ adminBearer: [] }] } }, async (request, reply) => {
       const admin = request.admin!
       const id = Number(request.params.id)
       if (!Number.isInteger(id) || id <= 0) {

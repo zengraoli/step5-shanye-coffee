@@ -51,7 +51,7 @@ export async function productRoutes(app: FastifyInstance): Promise<void> {
 
   // ---------- 用户端 ----------
 
-  app.get('/api/v1/categories', async (_request, reply) => {
+  app.get('/api/v1/categories', { schema: { tags: ['products'], summary: '分类列表' } }, async (_request, reply) => {
     const rows = db.prepare('SELECT * FROM categories ORDER BY sort, id').all() as unknown as CategoryRow[]
     const counts = db
       .prepare(
@@ -72,6 +72,7 @@ export async function productRoutes(app: FastifyInstance): Promise<void> {
 
   app.get<{ Querystring: { category_id?: string; keyword?: string; page?: string; page_size?: string } }>(
     '/api/v1/products',
+    { schema: { tags: ['products'], summary: '商品列表（仅上架商品，可分页筛选）' } },
     async (request, reply) => {
       const { category_id: categoryId, keyword } = request.query
       const page = Math.max(1, toInt(request.query.page, 1))
@@ -111,7 +112,7 @@ export async function productRoutes(app: FastifyInstance): Promise<void> {
     },
   )
 
-  app.get<{ Params: { id: string } }>('/api/v1/products/:id', async (request, reply) => {
+  app.get<{ Params: { id: string } }>('/api/v1/products/:id', { schema: { tags: ['products'], summary: '商品详情（含规格）' } }, async (request, reply) => {
     const id = Number(request.params.id)
     if (!Number.isInteger(id) || id <= 0) {
       fail('BAD_REQUEST', '商品 id 不合法')
@@ -136,7 +137,7 @@ export async function productRoutes(app: FastifyInstance): Promise<void> {
   app.register(async (instance) => {
     instance.addHook('preHandler', adminGuard(db))
 
-    instance.get('/api/v1/admin/products', async (request, reply) => {
+    instance.get('/api/v1/admin/products', { schema: { tags: ['admin', 'products'], summary: '后台商品列表（含下架商品）', security: [{ adminBearer: [] }] } }, async (request, reply) => {
       const query = request.query as { category_id?: string; keyword?: string; on_sale?: string; sold_out?: string }
       const conditions: string[] = []
       const params: (string | number)[] = []
@@ -173,7 +174,7 @@ export async function productRoutes(app: FastifyInstance): Promise<void> {
     // 上架 / 下架：仅管理员
     instance.register(async (adminScope) => {
       adminScope.addHook('preHandler', adminOnly())
-      adminScope.post<{ Body: Partial<ProductPayload> }>('/api/v1/admin/products', async (request, reply) => {
+      adminScope.post<{ Body: Partial<ProductPayload> }>('/api/v1/admin/products', { schema: { tags: ['admin', 'products'], summary: '新增商品', security: [{ adminBearer: [] }] } }, async (request, reply) => {
         const payload = request.body ?? {}
         const categoryId = Number(payload.categoryId)
         if (!Number.isInteger(categoryId) || categoryId <= 0) {
@@ -214,6 +215,7 @@ export async function productRoutes(app: FastifyInstance): Promise<void> {
 
       adminScope.put<{ Params: { id: string }; Body: Partial<ProductPayload> }>(
         '/api/v1/admin/products/:id',
+        { schema: { tags: ['admin', 'products'], summary: '编辑商品', security: [{ adminBearer: [] }] } },
         async (request, reply) => {
           const id = Number(request.params.id)
           if (!Number.isInteger(id) || id <= 0) {
@@ -283,6 +285,7 @@ export async function productRoutes(app: FastifyInstance): Promise<void> {
     // 上下架 / 售罄：管理员可改全部，店员仅可改售罄
     instance.patch<{ Params: { id: string }; Body: { onSale?: unknown; soldOut?: unknown } }>(
       '/api/v1/admin/products/:id/status',
+      { schema: { tags: ['admin', 'products'], summary: '上下架 / 售罄（店员仅可改售罄）', security: [{ adminBearer: [] }] } },
       async (request, reply) => {
         const id = Number(request.params.id)
         if (!Number.isInteger(id) || id <= 0) {

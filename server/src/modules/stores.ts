@@ -30,12 +30,12 @@ function serializeStore(store: StoreRow) {
 export async function storeRoutes(app: FastifyInstance): Promise<void> {
   const db = app.db
 
-  app.get('/api/v1/stores', async (_request, reply) => {
+  app.get('/api/v1/stores', { schema: { tags: ['stores'], summary: '门店列表（含营业状态）' } }, async (_request, reply) => {
     const stores = db.prepare('SELECT * FROM stores ORDER BY id').all() as unknown as StoreRow[]
     return sendOk(reply, stores.map(serializeStore))
   })
 
-  app.get<{ Params: { id: string } }>('/api/v1/stores/:id', async (request, reply) => {
+  app.get<{ Params: { id: string } }>('/api/v1/stores/:id', { schema: { tags: ['stores'], summary: '门店详情（含营业状态）' } }, async (request, reply) => {
     const id = Number(request.params.id)
     if (!Number.isInteger(id) || id <= 0) {
       fail('BAD_REQUEST', '门店 id 不合法')

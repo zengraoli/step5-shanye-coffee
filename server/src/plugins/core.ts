@@ -11,6 +11,10 @@ export async function responsePlugin(app: FastifyInstance): Promise<void> {
     if ((reply as unknown as Record<symbol, unknown>)[RAW_REPLY]) {
       return payload
     }
+    // OpenAPI 文档路由（/docs、/docs/json）返回原始内容，不做统一包装
+    if (request.url.startsWith('/docs')) {
+      return payload
+    }
     if (payload === null || payload === undefined || payload === '') {
       return payload
     }

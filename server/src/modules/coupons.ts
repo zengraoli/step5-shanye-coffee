@@ -116,7 +116,7 @@ export async function couponRoutes(app: FastifyInstance): Promise<void> {
   const db = app.db
 
   // 可领取的券模板（公开）
-  app.get('/api/v1/coupons', async (_request, reply) => {
+  app.get('/api/v1/coupons', { schema: { tags: ['coupons'], summary: '可领取的优惠券模板' } }, async (_request, reply) => {
     const rows = db
       .prepare(`SELECT * FROM coupons WHERE status = 'active' AND remaining > 0 ORDER BY id`)
       .all() as unknown as CouponRow[]
@@ -127,7 +127,7 @@ export async function couponRoutes(app: FastifyInstance): Promise<void> {
     instance.addHook('preHandler', memberGuard(db))
 
     // 我的优惠券
-    instance.get<{ Querystring: { status?: string } }>('/api/v1/members/me/coupons', async (request, reply) => {
+    instance.get<{ Querystring: { status?: string } }>('/api/v1/members/me/coupons', { schema: { tags: ['coupons', 'members'], summary: '我的优惠券', security: [{ memberBearer: [] }] } }, async (request, reply) => {
       const member = request.member!
       const filter = request.query.status
       const rows = db
@@ -146,7 +146,7 @@ export async function couponRoutes(app: FastifyInstance): Promise<void> {
     })
 
     // 领取优惠券
-    instance.post<{ Params: { id: string } }>('/api/v1/coupons/:id/claim', async (request, reply) => {
+    instance.post<{ Params: { id: string } }>('/api/v1/coupons/:id/claim', { schema: { tags: ['coupons', 'members'], summary: '领取优惠券', security: [{ memberBearer: [] }] } }, async (request, reply) => {
       const member = request.member!
       const couponId = Number(request.params.id)
       if (!Number.isInteger(couponId) || couponId <= 0) {
@@ -193,7 +193,7 @@ export async function couponRoutes(app: FastifyInstance): Promise<void> {
       items?: unknown
       memberCouponId?: unknown
     }
-    instance.post<{ Body: QuoteBody }>('/api/v1/orders/quote', async (request, reply) => {
+    instance.post<{ Body: QuoteBody }>('/api/v1/orders/quote', { schema: { tags: ['coupons', 'orders'], summary: '下单报价：金额明细与最优券推荐', security: [{ memberBearer: [] }] } }, async (request, reply) => {
       const member = request.member!
       const body = request.body ?? {}
       const storeId = Number(body.storeId)
@@ -293,7 +293,7 @@ export async function couponRoutes(app: FastifyInstance): Promise<void> {
     instance.addHook('preHandler', adminGuard(db))
     instance.addHook('preHandler', adminOnly())
 
-    instance.get('/api/v1/admin/coupons', async (_request, reply) => {
+    instance.get('/api/v1/admin/coupons', { schema: { tags: ['admin', 'coupons'], summary: '后台优惠券模板列表', security: [{ adminBearer: [] }] } }, async (request, reply) => {
       const rows = db.prepare('SELECT * FROM coupons ORDER BY id').all() as unknown as CouponRow[]
       const usage = db
         .prepare(`SELECT coupon_id, COUNT(*) AS n FROM member_coupons GROUP BY coupon_id`)
@@ -316,7 +316,7 @@ export async function couponRoutes(app: FastifyInstance): Promise<void> {
       total?: unknown
     }
 
-    instance.post<{ Body: CouponPayload }>('/api/v1/admin/coupons', async (request, reply) => {
+    instance.post<{ Body: CouponPayload }>('/api/v1/admin/coupons', { schema: { tags: ['admin', 'coupons'], summary: '新增优惠券模板', security: [{ adminBearer: [] }] } }, async (request, reply) => {
       const payload = request.body ?? {}
       const name = typeof payload.name === 'string' ? payload.name.trim() : ''
       if (name.length === 0 || name.length > 30) {
@@ -377,7 +377,7 @@ export async function couponRoutes(app: FastifyInstance): Promise<void> {
       return sendOk(reply, serializeTemplate(created), 201)
     })
 
-    instance.put<{ Params: { id: string }; Body: CouponPayload }>('/api/v1/admin/coupons/:id', async (request, reply) => {
+    instance.put<{ Params: { id: string }; Body: CouponPayload }>('/api/v1/admin/coupons/:id', { schema: { tags: ['admin', 'coupons'], summary: '编辑优惠券模板', security: [{ adminBearer: [] }] } }, async (request, reply) => {
       const id = Number(request.params.id)
       if (!Number.isInteger(id) || id <= 0) {
         fail('BAD_REQUEST', '优惠券 id 不合法')
@@ -448,6 +448,7 @@ export async function couponRoutes(app: FastifyInstance): Promise<void> {
 
     instance.patch<{ Params: { id: string }; Body: { status?: unknown } }>(
       '/api/v1/admin/coupons/:id/status',
+      { schema: { tags: ['admin', 'coupons'], summary: '停用 / 启用优惠券模板', security: [{ adminBearer: [] }] } },
       async (request, reply) => {
         const id = Number(request.params.id)
         if (!Number.isInteger(id) || id <= 0) {

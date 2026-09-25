@@ -25,7 +25,7 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
 
   // ---------- 会员 ----------
 
-  app.post<{ Body: LoginBody }>('/api/v1/auth/sms-code', async (request, reply) => {
+  app.post<{ Body: LoginBody }>('/api/v1/auth/sms-code', { schema: { tags: ['auth'], summary: '获取短信验证码（演示环境固定 123456）' } }, async (request, reply) => {
     const { phone } = request.body ?? {}
     if (!isValidPhone(phone)) {
       fail('INVALID_PHONE')
@@ -37,7 +37,7 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
     })
   })
 
-  app.post<{ Body: LoginBody }>('/api/v1/auth/login', async (request, reply) => {
+  app.post<{ Body: LoginBody }>('/api/v1/auth/login', { schema: { tags: ['auth'], summary: '会员手机号 + 验证码登录' } }, async (request, reply) => {
     const { phone, code } = request.body ?? {}
     if (!isValidPhone(phone)) {
       fail('INVALID_PHONE')
@@ -59,7 +59,7 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
   app.register(async (instance) => {
     instance.addHook('preHandler', memberGuard(db))
 
-    instance.get('/api/v1/members/me', async (request, reply) => {
+    instance.get('/api/v1/members/me', { schema: { tags: ['auth', 'members'], summary: '当前会员信息', security: [{ memberBearer: [] }] } }, async (request, reply) => {
       const session = request.member!
       const member = db
         .prepare('SELECT id, phone, nickname, points, level, created_at FROM members WHERE id = ?')
@@ -67,7 +67,7 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
       return sendOk(reply, serializeMember(db, member))
     })
 
-    instance.post('/api/v1/auth/logout', async (request, reply) => {
+    instance.post('/api/v1/auth/logout', { schema: { tags: ['auth'], summary: '会员登出', security: [{ memberBearer: [] }] } }, async (request, reply) => {
       const header = request.headers.authorization
       if (typeof header === 'string' && header.startsWith('Bearer ')) {
         revokeToken(db, header.slice(7).trim())
@@ -78,7 +78,7 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
 
   // ---------- 后台 ----------
 
-  app.post<{ Body: AdminLoginBody }>('/api/v1/admin/auth/login', async (request, reply) => {
+  app.post<{ Body: AdminLoginBody }>('/api/v1/admin/auth/login', { schema: { tags: ['auth'], summary: '后台账号密码登录' } }, async (request, reply) => {
     const { username, password } = request.body ?? {}
     if (typeof username !== 'string' || typeof password !== 'string' || username.length === 0 || password.length === 0) {
       fail('BAD_REQUEST', '请输入账号和密码')
@@ -110,7 +110,7 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
   app.register(async (instance) => {
     instance.addHook('preHandler', adminGuard(db))
 
-    instance.get('/api/v1/admin/auth/me', async (request, reply) => {
+    instance.get('/api/v1/admin/auth/me', { schema: { tags: ['auth'], summary: '当前后台账号信息', security: [{ adminBearer: [] }] } }, async (request, reply) => {
       const admin = request.admin!
       return sendOk(reply, {
         id: admin.id,
@@ -121,7 +121,7 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
       })
     })
 
-    instance.post('/api/v1/admin/auth/logout', async (request, reply) => {
+    instance.post('/api/v1/admin/auth/logout', { schema: { tags: ['auth'], summary: '后台登出', security: [{ adminBearer: [] }] } }, async (request, reply) => {
       const header = request.headers.authorization
       if (typeof header === 'string' && header.startsWith('Bearer ')) {
         revokeToken(db, header.slice(7).trim())
@@ -132,7 +132,7 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
     // 后台账号列表：仅管理员可见（店员访问返回 403）
     instance.register(async (adminScope) => {
       adminScope.addHook('preHandler', adminOnly())
-      adminScope.get('/api/v1/admin/accounts', async (request, reply) => {
+      adminScope.get('/api/v1/admin/accounts', { schema: { tags: ['admin'], summary: '后台账号列表（仅管理员）', security: [{ adminBearer: [] }] } }, async (request, reply) => {
         const rows = db
           .prepare(
             `SELECT a.id, a.username, a.role, a.store_id, a.nickname, a.status, s.name AS store_name

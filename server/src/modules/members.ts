@@ -25,7 +25,7 @@ export async function memberRoutes(app: FastifyInstance): Promise<void> {
     instance.addHook('preHandler', memberGuard(db))
 
     // 积分总览与明细
-    instance.get('/api/v1/members/me/points', async (request, reply) => {
+    instance.get('/api/v1/members/me/points', { schema: { tags: ['members'], summary: '积分总览与明细', security: [{ memberBearer: [] }] } }, async (request, reply) => {
       const member = request.member!
       const row = db.prepare('SELECT * FROM members WHERE id = ?').get(member.id) as unknown as MemberRow
       const profile = serializeMember(db, row)
@@ -67,7 +67,7 @@ export async function memberRoutes(app: FastifyInstance): Promise<void> {
     // 会员列表（手机号脱敏）
     instance.get<{
       Querystring: { keyword?: string; level?: string; page?: string; page_size?: string }
-    }>('/api/v1/admin/members', async (request, reply) => {
+    }>('/api/v1/admin/members', { schema: { tags: ['admin', 'members'], summary: '会员列表（手机号脱敏，仅管理员）', security: [{ adminBearer: [] }] } }, async (request, reply) => {
       const query = request.query
       const conditions: string[] = []
       const params: (string | number)[] = []
@@ -116,7 +116,7 @@ export async function memberRoutes(app: FastifyInstance): Promise<void> {
     })
 
     // 会员详情
-    instance.get<{ Params: { id: string } }>('/api/v1/admin/members/:id', async (request, reply) => {
+    instance.get<{ Params: { id: string } }>('/api/v1/admin/members/:id', { schema: { tags: ['admin', 'members'], summary: '会员详情（仅管理员）', security: [{ adminBearer: [] }] } }, async (request, reply) => {
       const id = Number(request.params.id)
       if (!Number.isInteger(id) || id <= 0) {
         fail('BAD_REQUEST', '会员 id 不合法')

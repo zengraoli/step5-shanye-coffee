@@ -1,6 +1,7 @@
 import Fastify, { type FastifyInstance } from 'fastify'
 import cors from '@fastify/cors'
 import { errorHandlerPlugin, responsePlugin } from './plugins/core.js'
+import { openapiPlugin } from './plugins/openapi.js'
 import { registerRoutes } from './routes/index.js'
 import type { Db } from './db/index.js'
 
@@ -26,8 +27,10 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<FastifyIn
   // 直接在根实例上挂载，保证所有路由（含后续模块）都经过统一包装与错误处理
   await responsePlugin(app)
   await errorHandlerPlugin(app)
+  // OpenAPI 需在路由注册前挂载（onRoute 才能收集到全部路由）
+  await openapiPlugin(app)
 
-  app.get('/health', async () => ({
+  app.get('/health', { schema: { tags: ['health'], summary: '健康检查' } }, async () => ({
     status: 'ok',
     service: 'shanye-coffee-server',
     time: new Date().toISOString(),
