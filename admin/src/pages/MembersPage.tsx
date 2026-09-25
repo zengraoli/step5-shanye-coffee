@@ -192,7 +192,7 @@ export function MembersPage() {
                   <TableRow key={member.id}>
                     <TableCell>
                       <p className="text-sm font-medium">{member.nickname}</p>
-                      <p className="text-xs text-muted-foreground">{member.phone}</p>
+                      <p className="text-xs text-muted-foreground">{member.maskedPhone}</p>
                     </TableCell>
                     <TableCell>
                       <Badge variant={LEVEL_VARIANT[member.level] ?? 'outline'}>{member.levelText}</Badge>
@@ -271,7 +271,7 @@ function MemberDetailDialog({ open, member, onClose }: MemberDetailDialogProps) 
               <DialogTitle className="flex items-center gap-2 text-base">
                 <User className="size-4 text-caramel" />
                 {member.nickname}
-                <span className="font-mono text-sm text-muted-foreground">{member.phone}</span>
+                <span className="font-mono text-sm text-muted-foreground">{member.maskedPhone}</span>
               </DialogTitle>
               <DialogDescription>
                 注册于 {formatBeijingTime(member.createdAt)} · 累计消费 {formatMoney(member.totalPayFen)} ·{' '}

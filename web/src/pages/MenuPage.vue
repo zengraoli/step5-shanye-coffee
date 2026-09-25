@@ -103,7 +103,7 @@ onMounted(async () => {
           :title="activeCategory.name"
           :desc="`${activeCategory.productCount} 款在售商品`"
         />
-        <SectionTitle v-else eyebrow="ALL" title="全部在售" desc="按分类排序，价格单位为元" />
+        <SectionTitle v-else eyebrow="ALL" title="全部在售" desc="按分类排序，金额显示为 ¥xx.xx" />
 
         <div class="menu-grid">
           <ProductCard
@@ -135,7 +135,7 @@ onMounted(async () => {
         </div>
         <div>
           <h3>会员权益</h3>
-          <p>消费 1 元积 1 分，最高黑卡享专属优惠券</p>
+          <p>消费按实付金额每 1 元积 1 分，最高黑卡享专属优惠券</p>
         </div>
       </div>
       <p class="menu-note__tip">

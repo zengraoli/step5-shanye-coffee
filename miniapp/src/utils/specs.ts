@@ -1,4 +1,4 @@
-/** 规格定义：与 server 保持一致（大杯加 3 元） */
+/** 规格定义：与 server 保持一致（大杯加 ¥3.00） */
 import type { SpecGroup } from '@/api/catalog'
 
 export type SpecSelection = Record<string, string>

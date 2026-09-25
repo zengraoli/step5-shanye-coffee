@@ -21,6 +21,10 @@ npm run dev:mp-weixin
 VITE_API_BASE_URL=http://127.0.0.1:3000 npm run dev:h5
 ```
 
+## 默认账号
+
+小程序无需后台账号；会员登录使用**手机号 + 验证码**，演示环境验证码固定为 `123456`，未注册手机号首次登录自动创建会员（银卡）。
+
 ## 在微信开发者工具中导入
 
 1. 执行 `npm run build:mp-weixin`（或 `npm run dev:mp-weixin` 保持监听编译）；

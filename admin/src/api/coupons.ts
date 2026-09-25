@@ -50,11 +50,12 @@ export function updateCouponStatus(id: number, status: 'active' | 'inactive'): P
   return apiFetch<AdminCoupon>(`/api/v1/admin/coupons/${id}/status`, { method: 'PATCH', body: { status } })
 }
 
-/** 券规则描述 */
+/** 券规则描述（金额统一格式化为 ¥xx.xx） */
 export function describeCoupon(coupon: AdminCoupon): string {
+  const yuan = (fen: number): string => `¥${(fen / 100).toFixed(2)}`
   if (coupon.type === 'full_reduction') {
-    return `满 ${(coupon.thresholdFen / 100).toFixed(2)} 元减 ${(coupon.reduceFen / 100).toFixed(2)} 元`
+    return `满 ${yuan(coupon.thresholdFen)} 减 ${yuan(coupon.reduceFen)}`
   }
-  const max = coupon.maxReduceFen > 0 ? `，最高减 ${(coupon.maxReduceFen / 100).toFixed(2)} 元` : ''
-  return `${(coupon.discountPercent / 10).toFixed(1)} 折（满 ${(coupon.thresholdFen / 100).toFixed(2)} 元可用${max}）`
+  const max = coupon.maxReduceFen > 0 ? `，最高减 ${yuan(coupon.maxReduceFen)}` : ''
+  return `${(coupon.discountPercent / 10).toFixed(1)} 折（满 ${yuan(coupon.thresholdFen)} 可用${max}）`
 }

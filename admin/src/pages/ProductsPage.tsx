@@ -430,7 +430,7 @@ function ProductDialog({ open, product, categories, onClose, onSaved }: ProductD
         <DialogHeader>
           <DialogTitle>{product ? `编辑商品：${product.name}` : '新增商品'}</DialogTitle>
           <DialogDescription>
-            规格为全局固定选项：杯型（中 / 大，大杯加 3 元）、温度（冰 / 热）、糖度（无 / 少 / 标准）。
+            规格为全局固定选项：杯型（中 / 大，大杯加 ¥3.00）、温度（冰 / 热）、糖度（无 / 少 / 标准）。
           </DialogDescription>
         </DialogHeader>
         <form className="space-y-4" onSubmit={(event) => void onSubmit(event)}>

@@ -1,95 +1,132 @@
 @import 'tailwindcss';
 @import 'tw-animate-css';
 @import 'shadcn/tailwind.css';
-@import '@fontsource-variable/geist';
 
 @custom-variant dark (&:is(.dark *));
 
 /*
  * 山野咖啡品牌主题变量（三端共用同一套品牌视觉，此处为 admin 端主题文件）
- * 主色：深山棕（咖啡豆）；点缀：焦糖橙；辅助：抹茶绿
+ * 与 web（src/styles/theme.css）、miniapp（src/uni.scss）使用相同的变量名与色值：
+ *   主色：深山棕；点缀：焦糖；辅助：抹茶；底色：米白
+ * 字体层级：--font-display 衬线标题 / --font-body 无衬线正文
+ * 圆角刻度：8 / 14 / 22 / 32 / 999px；间距刻度：4 / 8 / 12 / 16 / 24 / 32 / 48 / 64 / 96px
+ *   （Tailwind 的 p-4 = 16px 即 --space-4，数值体系一致）
  */
 :root {
-  /* 品牌色板 */
-  --brand: oklch(0.42 0.062 58);            /* 深山棕 */
-  --brand-foreground: oklch(0.98 0.012 85); /* 奶盖白 */
-  --brand-muted: oklch(0.94 0.022 80);      /* 燕麦奶 */
-  --caramel: oklch(0.72 0.115 62);          /* 焦糖 */
-  --caramel-foreground: oklch(0.3 0.06 58);
-  --matcha: oklch(0.62 0.075 145);          /* 抹茶绿 */
-  --cream: oklch(0.975 0.012 85);           /* 米白背景 */
+  /* 品牌色板（三端一致） */
+  --brand-900: #2b2118; /* 墨咖 */
+  --brand-700: #4a3728; /* 深山棕（主色） */
+  --brand-500: #6b4f3a; /* 焙棕 */
+  --brand-300: #a68a6d; /* 浅焙 */
+  --caramel-600: #b07f4a; /* 深焦糖 */
+  --caramel-500: #c89b6a; /* 焦糖（点缀） */
+  --caramel-300: #e8c9a0; /* 浅焦糖 */
+  --matcha-600: #5f7d4f; /* 深抹茶 */
+  --matcha-500: #7d9b6a; /* 抹茶（辅助） */
+  --cream-50: #faf6ef; /* 米白（页面底色） */
+  --cream-100: #f3ece0; /* 燕麦奶 */
+  --cream-200: #e9dfd0; /* 奶泡（分隔线） */
+  --paper: #fffdf9; /* 纸白 */
+  --line-strong: #dccfba; /* 边框强调 */
 
-  --background: var(--cream);
-  --foreground: oklch(0.24 0.028 58);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.24 0.028 58);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.24 0.028 58);
-  --primary: var(--brand);
-  --primary-foreground: var(--brand-foreground);
-  --secondary: oklch(0.94 0.022 80);
-  --secondary-foreground: oklch(0.34 0.04 58);
-  --muted: oklch(0.95 0.014 80);
-  --muted-foreground: oklch(0.53 0.02 62);
-  --accent: oklch(0.93 0.03 78);
-  --accent-foreground: oklch(0.34 0.045 58);
-  --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.89 0.018 78);
-  --input: oklch(0.89 0.018 78);
-  --ring: var(--caramel);
-  --chart-1: var(--brand);
-  --chart-2: var(--caramel);
-  --chart-3: var(--matcha);
-  --chart-4: oklch(0.72 0.09 40);
-  --chart-5: oklch(0.6 0.05 200);
-  --radius: 0.625rem;
-  --sidebar: oklch(0.3 0.042 55);
-  --sidebar-foreground: oklch(0.94 0.018 82);
-  --sidebar-primary: var(--caramel);
-  --sidebar-primary-foreground: oklch(0.28 0.05 58);
-  --sidebar-accent: oklch(0.37 0.048 57);
-  --sidebar-accent-foreground: oklch(0.97 0.014 85);
-  --sidebar-border: oklch(0.4 0.045 58);
-  --sidebar-ring: var(--caramel);
+  /* 字体层级（三端一致） */
+  --font-display: 'Songti SC', 'Noto Serif SC', 'Source Han Serif SC', 'SimSun', Georgia, serif;
+  --font-body: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Hiragino Sans GB',
+    'Microsoft YaHei', 'Segoe UI', Roboto, sans-serif;
+  /* 圆角基准（刻度由 @theme inline 定义：8 / 14 / 22 / 32 / 44 / 56 / 68px） */
+  --radius: 14px;
+
+  /* 间距刻度（三端一致，供 CSS 变量方式引用） */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  --space-7: 48px;
+  --space-8: 64px;
+  --space-9: 96px;
+
+  /* 兼容别名（供既有 bg-brand / text-caramel 等类名继续使用） */
+  --brand: var(--brand-700);
+  --brand-foreground: var(--cream-50);
+  --brand-muted: var(--cream-100);
+  --caramel: var(--caramel-500);
+  --caramel-foreground: var(--brand-900);
+  --matcha: var(--matcha-500);
+  --cream: var(--cream-50);
+
+  /* shadcn 语义变量（映射到品牌色板） */
+  --background: var(--cream-50);
+  --foreground: var(--brand-900);
+  --card: var(--paper);
+  --card-foreground: var(--brand-900);
+  --popover: var(--paper);
+  --popover-foreground: var(--brand-900);
+  --primary: var(--brand-700);
+  --primary-foreground: var(--cream-50);
+  --secondary: var(--cream-100);
+  --secondary-foreground: var(--brand-700);
+  --muted: var(--cream-100);
+  --muted-foreground: #6f6255;
+  --accent: var(--cream-200);
+  --accent-foreground: var(--brand-700);
+  --destructive: #b4442f;
+  --border: var(--line-strong);
+  --input: var(--line-strong);
+  --ring: var(--caramel-500);
+  --chart-1: var(--brand-700);
+  --chart-2: var(--caramel-500);
+  --chart-3: var(--matcha-500);
+  --chart-4: #d98a5f;
+  --chart-5: #6b8fa8;
+  --sidebar: var(--brand-900);
+  --sidebar-foreground: var(--cream-100);
+  --sidebar-primary: var(--caramel-500);
+  --sidebar-primary-foreground: var(--brand-900);
+  --sidebar-accent: var(--brand-700);
+  --sidebar-accent-foreground: var(--cream-50);
+  --sidebar-border: var(--brand-700);
+  --sidebar-ring: var(--caramel-500);
 }
 
 .dark {
-  --background: oklch(0.19 0.022 58);
-  --foreground: oklch(0.95 0.014 82);
-  --card: oklch(0.24 0.026 58);
-  --card-foreground: oklch(0.95 0.014 82);
-  --popover: oklch(0.24 0.026 58);
-  --popover-foreground: oklch(0.95 0.014 82);
-  --primary: oklch(0.72 0.1 62);
-  --primary-foreground: oklch(0.22 0.04 58);
-  --secondary: oklch(0.29 0.028 58);
-  --secondary-foreground: oklch(0.95 0.014 82);
-  --muted: oklch(0.29 0.028 58);
-  --muted-foreground: oklch(0.72 0.025 72);
-  --accent: oklch(0.33 0.035 60);
-  --accent-foreground: oklch(0.96 0.014 85);
-  --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 12%);
-  --input: oklch(1 0 0 / 16%);
-  --ring: oklch(0.72 0.1 62);
-  --chart-1: oklch(0.72 0.1 62);
-  --chart-2: oklch(0.78 0.09 75);
-  --chart-3: oklch(0.62 0.075 145);
-  --chart-4: oklch(0.72 0.09 40);
-  --chart-5: oklch(0.6 0.05 200);
-  --sidebar: oklch(0.24 0.026 58);
-  --sidebar-foreground: oklch(0.94 0.018 82);
-  --sidebar-primary: oklch(0.72 0.1 62);
-  --sidebar-primary-foreground: oklch(0.22 0.04 58);
-  --sidebar-accent: oklch(0.31 0.032 60);
-  --sidebar-accent-foreground: oklch(0.96 0.014 85);
-  --sidebar-border: oklch(1 0 0 / 12%);
-  --sidebar-ring: oklch(0.72 0.1 62);
+  --background: #241b14;
+  --foreground: var(--cream-100);
+  --card: #2f241b;
+  --card-foreground: var(--cream-100);
+  --popover: #2f241b;
+  --popover-foreground: var(--cream-100);
+  --primary: var(--caramel-500);
+  --primary-foreground: var(--brand-900);
+  --secondary: #3a2c21;
+  --secondary-foreground: var(--cream-100);
+  --muted: #3a2c21;
+  --muted-foreground: #b3a491;
+  --accent: #453527;
+  --accent-foreground: var(--cream-50);
+  --destructive: #d9705a;
+  --border: rgb(243 236 224 / 14%);
+  --input: rgb(243 236 224 / 18%);
+  --ring: var(--caramel-500);
+  --chart-1: var(--caramel-500);
+  --chart-2: var(--caramel-300);
+  --chart-3: var(--matcha-500);
+  --chart-4: #d98a5f;
+  --chart-5: #6b8fa8;
+  --sidebar: #1f1710;
+  --sidebar-foreground: var(--cream-100);
+  --sidebar-primary: var(--caramel-500);
+  --sidebar-primary-foreground: var(--brand-900);
+  --sidebar-accent: #3a2c21;
+  --sidebar-accent-foreground: var(--cream-50);
+  --sidebar-border: #453527;
+  --sidebar-ring: var(--caramel-500);
 }
 
 @theme inline {
-  --font-heading: var(--font-sans);
-  --font-sans: 'Geist Variable', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
+  --font-heading: var(--font-display);
+  --font-sans: var(--font-body);
   --color-brand: var(--brand);
   --color-brand-foreground: var(--brand-foreground);
   --color-brand-muted: var(--brand-muted);
@@ -127,13 +164,14 @@
   --color-card: var(--card);
   --color-foreground: var(--foreground);
   --color-background: var(--background);
-  --radius-sm: calc(var(--radius) * 0.6);
-  --radius-md: calc(var(--radius) * 0.8);
-  --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) * 1.4);
-  --radius-2xl: calc(var(--radius) * 1.8);
-  --radius-3xl: calc(var(--radius) * 2.2);
-  --radius-4xl: calc(var(--radius) * 2.6);
+  /* 圆角刻度（三端一致） */
+  --radius-sm: 8px;
+  --radius-md: 14px;
+  --radius-lg: 22px;
+  --radius-xl: 32px;
+  --radius-2xl: 44px;
+  --radius-3xl: 56px;
+  --radius-4xl: 68px;
 }
 
 @layer base {
@@ -142,8 +180,16 @@
   }
   body {
     @apply bg-background text-foreground;
+    font-family: var(--font-body);
   }
   html {
     @apply font-sans;
+  }
+  h1,
+  h2,
+  h3,
+  h4 {
+    font-family: var(--font-display);
+    letter-spacing: 0.02em;
   }
 }
