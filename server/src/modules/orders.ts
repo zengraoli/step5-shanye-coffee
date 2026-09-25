@@ -15,6 +15,7 @@ import {
   type OrderStatus,
 } from '../lib/order-status.js'
 import { priceCart, type CartItemInput } from './pricing.js'
+import { specLabel } from '../lib/specs.js'
 import { grantPointsForOrder } from './points.js'
 import { withTransaction } from '../db/tx.js'
 import { maskPhone } from '../lib/phone.js'
@@ -162,7 +163,7 @@ function serializeOrder(db: Db, order: OrderRow): OrderDetail {
     statusText: ORDER_STATUS_TEXT[order.status as OrderStatus],
     items: items.map((item) => {
       const spec = JSON.parse(item.spec) as Record<string, string>
-      const specText = Object.values(spec).join(' / ')
+      const specText = specLabel(spec)
       return {
         productId: item.product_id,
         productName: item.product_name,

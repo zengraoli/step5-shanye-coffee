@@ -18,6 +18,9 @@ const state = reactive<{
   ready: false,
 })
 
+/** 导出可变状态，便于测试与调试 */
+export const authState = state
+
 export function useAuth() {
   /** 手机号 + 验证码登录 */
   const login = async (phone: string, code: string): Promise<MemberProfile> => {
