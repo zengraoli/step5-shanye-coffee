@@ -1,4 +1,5 @@
 import type { FastifyInstance } from 'fastify'
+import { adminStoreRoutes } from '../modules/admin-stores.js'
 import { authRoutes } from '../modules/auth.js'
 import { couponRoutes } from '../modules/coupons.js'
 import { dashboardRoutes } from '../modules/dashboard.js'
@@ -16,4 +17,5 @@ export async function registerRoutes(app: FastifyInstance): Promise<void> {
   await app.register(orderRoutes)
   await app.register(memberRoutes)
   await app.register(dashboardRoutes)
+  await app.register(adminStoreRoutes)
 }

@@ -77,6 +77,7 @@ ADMIN_PASSWORD=xxx STAFF_PASSWORD=xxx npm run dev
 | 后台会员 | `GET /api/v1/admin/members`、`GET /api/v1/admin/members/:id` |
 | 后台账号 | `GET /api/v1/admin/accounts` |
 | 后台看板 | `GET /api/v1/admin/dashboard` |
+| 后台门店 | `GET /api/v1/admin/stores`、`PUT /api/v1/admin/stores/:id` |
 
 鉴权方式：请求头 `Authorization: Bearer <token>`，会员与后台 token 不通用。
 
