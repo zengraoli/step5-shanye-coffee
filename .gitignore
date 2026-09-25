@@ -1,0 +1,12 @@
+node_modules/
+dist/
+unpackage/
+.vite/
+coverage/
+*.db
+*.db-journal
+*.sqlite
+.env
+.env.*
+*.log
+.DS_Store
