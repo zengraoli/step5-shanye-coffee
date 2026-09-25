@@ -3,20 +3,18 @@ import { useState } from 'react'
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
 import { BrandLogo } from './BrandLogo'
 import { UserMenu } from './UserMenu'
-import { NAV_ITEMS, navItemsForRole, type AdminRole } from '@/routes/nav'
+import { NAV_ITEMS, navItemsForRole } from '@/routes/nav'
+import { useRole } from '@/auth/AuthContext'
 import { apiBaseUrl } from '@/api/client'
 import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
 import { cn } from '@/lib/utils'
 
-interface AppLayoutProps {
-  role?: AdminRole
-}
-
 /** 后台基础布局：侧边栏 + 顶栏 + 内容区 */
-export function AppLayout({ role }: AppLayoutProps) {
+export function AppLayout() {
   const [mobileOpen, setMobileOpen] = useState(false)
   const location = useLocation()
+  const role = useRole()
   const items = role ? navItemsForRole(role) : NAV_ITEMS
   const current = items.find((item) => location.pathname.startsWith(item.to))
 
