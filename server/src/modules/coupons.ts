@@ -192,6 +192,8 @@ export async function couponRoutes(app: FastifyInstance): Promise<void> {
       orderType?: unknown
       items?: unknown
       memberCouponId?: unknown
+      /** true 表示本次下单不使用优惠券 */
+      withoutCoupon?: unknown
     }
     instance.post<{ Body: QuoteBody }>('/api/v1/orders/quote', { schema: { tags: ['coupons', 'orders'], summary: '下单报价：金额明细与最优券推荐', security: [{ memberBearer: [] }] } }, async (request, reply) => {
       const member = request.member!
@@ -247,7 +249,8 @@ export async function couponRoutes(app: FastifyInstance): Promise<void> {
 
       let selectedId: number | null = null
       let discountFen = 0
-      if (body.memberCouponId !== undefined && body.memberCouponId !== null && body.memberCouponId !== '') {
+      const withoutCoupon = body.withoutCoupon === true
+      if (!withoutCoupon && body.memberCouponId !== undefined && body.memberCouponId !== null && body.memberCouponId !== '') {
         const selected = ownCoupons.find((row) => row.id === Number(body.memberCouponId))
         if (!selected) {
           fail('COUPON_NOT_FOUND', '优惠券不存在或不属于当前会员')
@@ -264,7 +267,7 @@ export async function couponRoutes(app: FastifyInstance): Promise<void> {
         }
         selectedId = selected.id
         discountFen = discount
-      } else {
+      } else if (!withoutCoupon) {
         const best = pickBestCoupon(candidates, totalFen, now)
         if (best) {
           selectedId = best.id

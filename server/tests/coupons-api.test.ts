@@ -167,6 +167,46 @@ test('下单报价自动推荐最优券并计算金额明细', async () => {
   }
 })
 
+test('可以选择不使用优惠券（withoutCoupon）', async () => {
+  const { app, db } = await createTestApp()
+  const token = await loginMember(app, '13800000007')
+  try {
+    forceStoreOpen(db, 1)
+    const claim = await app.inject({
+      method: 'POST',
+      url: '/api/v1/coupons/1/claim',
+      headers: { authorization: `Bearer ${token}` },
+    })
+    const couponId = claim.json().data.id as number
+    const quote = await app.inject({
+      method: 'POST',
+      url: '/api/v1/orders/quote',
+      headers: { authorization: `Bearer ${token}` },
+      payload: {
+        storeId: 1,
+        orderType: 'takeout',
+        items: [{ productId: 1, spec: { cup: 'large', temp: 'ice', sugar: 'less' }, quantity: 2 }],
+        withoutCoupon: true,
+      },
+    })
+    assert.equal(quote.statusCode, 200, quote.body)
+    const data = quote.json().data
+    assert.equal(data.discountFen, 0)
+    assert.equal(data.payFen, data.totalFen)
+    assert.equal(data.bestCouponId, null)
+    assert.equal(data.selectedCouponId, null)
+    const coupons = await app.inject({
+      method: 'GET',
+      url: '/api/v1/members/me/coupons?status=unused',
+      headers: { authorization: `Bearer ${token}` },
+    })
+    assert.equal(coupons.json().data.length, 1)
+    assert.equal(coupons.json().data[0].id, couponId)
+  } finally {
+    await app.close()
+  }
+})
+
 test('不满足使用条件的券手动选择时报错', async () => {
   const { app, db } = await createTestApp()
   const token = await loginMember(app, '13800000005')
