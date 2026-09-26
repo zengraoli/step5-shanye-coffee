@@ -83,7 +83,16 @@ fun ShanyeApp() {
                 composable(
                     route = Routes.ORDERS,
                     deepLinks = listOf(navDeepLink { uriPattern = "shanye://orders" }),
-                ) { OrdersScreen() }
+                ) {
+                    OrdersScreen(
+                        onOrderClick = { orderId ->
+                            navController.navigate(Routes.orderDetail(orderId))
+                        },
+                        onGoLogin = {
+                            navController.navigate(Routes.LOGIN)
+                        },
+                    )
+                }
 
                 composable(
                     route = Routes.PROFILE,

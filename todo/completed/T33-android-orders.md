@@ -1,7 +1,7 @@
 # T33 订单详情与订单列表
 
 阶段：S6 android
-状态：待完成
+状态：已完成（v0.38，2026-09-26）
 设计稿：`docs/design/android/AD5-order-detail.png`
 
 ## 要做什么
