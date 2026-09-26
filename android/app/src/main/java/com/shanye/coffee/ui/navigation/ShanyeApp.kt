@@ -5,6 +5,8 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import kotlinx.coroutines.flow.first
 import androidx.compose.ui.Modifier
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
@@ -13,6 +15,9 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import androidx.navigation.navDeepLink
+import com.shanye.coffee.data.MemberSession
+import com.shanye.coffee.data.remote.dto.MemberProfileDto
+import com.shanye.coffee.ui.LocalAppContainer
 import com.shanye.coffee.ui.checkout.CheckoutScreen
 import com.shanye.coffee.ui.home.HomeScreen
 import com.shanye.coffee.ui.login.LoginScreen
@@ -25,6 +30,17 @@ import com.shanye.coffee.ui.profile.ProfileScreen
 @Composable
 fun ShanyeApp() {
     val navController = rememberNavController()
+    val container = LocalAppContainer.current
+
+    // 启动时恢复本地保存的登录态
+    LaunchedEffect(Unit) {
+        container.sessionStore.profileJsonFlow.first()?.let { json ->
+            runCatching {
+                kotlinx.serialization.json.Json { ignoreUnknownKeys = true }
+                    .decodeFromString<com.shanye.coffee.data.remote.dto.MemberProfileDto>(json)
+            }.onSuccess { com.shanye.coffee.data.MemberSession.update(it) }
+        }
+    }
 
     Scaffold(
         bottomBar = { ShanyeBottomBar(navController) },
@@ -59,7 +75,21 @@ fun ShanyeApp() {
                 composable(
                     route = Routes.LOGIN,
                     deepLinks = listOf(navDeepLink { uriPattern = "shanye://login" }),
-                ) { LoginScreen() }
+                ) {
+                    LoginScreen(
+                        onLoggedIn = {
+                            // 登录后回到原页面：有返回栈则返回，否则回首页
+                            if (navController.previousBackStackEntry != null) {
+                                navController.popBackStack()
+                            } else {
+                                navController.navigate(Routes.HOME) {
+                                    popUpTo(Routes.HOME) { inclusive = true }
+                                    launchSingleTop = true
+                                }
+                            }
+                        },
+                    )
+                }
 
                 composable(
                     route = Routes.CHECKOUT,

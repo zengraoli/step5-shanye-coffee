@@ -1,7 +1,7 @@
 # T30 登录
 
 阶段：S6 android
-状态：待完成
+状态：已完成（v0.35，2026-09-26）
 设计稿：`docs/design/android/AD1-login.png`
 
 ## 要做什么
