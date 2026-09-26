@@ -85,7 +85,7 @@ fun OrderDetailScreen(orderId: Long, onBack: () -> Unit, onGoLogin: () -> Unit =
 }
 
 @Composable
-private fun OrderDetailScreenContent(
+internal fun OrderDetailScreenContent(
     state: OrderDetailUiState,
     onBack: () -> Unit,
     onRefresh: () -> Unit,
@@ -144,7 +144,7 @@ private fun OrderDetailScreenContent(
 }
 
 @Composable
-private fun OrderDetailBody(
+internal fun OrderDetailBody(
     state: OrderDetailUiState,
     onPay: () -> Unit,
     onCancel: () -> Unit,
@@ -348,7 +348,7 @@ private fun pickupHint(order: OrderDto): String = when (order.status) {
 }
 
 @Composable
-private fun InfoRow(label: String, value: String, valueColor: Color = TextPrimary) {
+internal fun InfoRow(label: String, value: String, valueColor: Color = TextPrimary) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -365,7 +365,7 @@ private fun InfoRow(label: String, value: String, valueColor: Color = TextPrimar
 }
 
 @Composable
-private fun ActionButton(
+internal fun ActionButton(
     text: String,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
@@ -397,7 +397,7 @@ private fun ActionButton(
 }
 
 @Composable
-private fun LoginPrompt(onGoLogin: () -> Unit) {
+internal fun LoginPrompt(onGoLogin: () -> Unit) {
     Column(
         modifier = Modifier
             .fillMaxSize()

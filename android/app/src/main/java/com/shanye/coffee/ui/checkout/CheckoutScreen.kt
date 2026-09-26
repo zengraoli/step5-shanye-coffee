@@ -78,7 +78,7 @@ fun CheckoutScreen(onPaid: (Long) -> Unit, onBack: () -> Unit, onGoLogin: () -> 
 }
 
 @Composable
-private fun CheckoutScreenContent(
+internal fun CheckoutScreenContent(
     state: CheckoutUiState,
     onSelectOrderType: (String) -> Unit,
     onSelectCoupon: (Long) -> Unit,
@@ -129,6 +129,7 @@ private fun CheckoutScreenContent(
             }
             else -> CheckoutBody(
                 state = state,
+                modifier = Modifier.weight(1f),
                 onSelectOrderType = onSelectOrderType,
                 onSelectCoupon = onSelectCoupon,
                 onClearCoupon = onClearCoupon,
@@ -139,8 +140,9 @@ private fun CheckoutScreenContent(
 }
 
 @Composable
-private fun CheckoutBody(
+internal fun CheckoutBody(
     state: CheckoutUiState,
+    modifier: Modifier = Modifier,
     onSelectOrderType: (String) -> Unit,
     onSelectCoupon: (Long) -> Unit,
     onClearCoupon: () -> Unit,
@@ -148,7 +150,8 @@ private fun CheckoutBody(
 ) {
     val quote = state.quote ?: return
 
-    Column(modifier = Modifier.fillMaxSize()) {
+    // 上部滚动内容 + 底部结算栏（高度由调用方通过 modifier 约束）
+    Column(modifier = modifier) {
       Column(
         modifier = Modifier
             .weight(1f)
@@ -345,7 +348,7 @@ private fun CheckoutBody(
 }
 
 @Composable
-private fun OrderTypeToggle(orderType: String, onSelect: (String) -> Unit) {
+internal fun OrderTypeToggle(orderType: String, onSelect: (String) -> Unit) {
     Row(
         modifier = Modifier
             .clip(RoundedCornerShape(percent = 50))
@@ -372,7 +375,7 @@ private fun OrderTypeToggle(orderType: String, onSelect: (String) -> Unit) {
 }
 
 @Composable
-private fun OrderItemRow(item: OrderItemDto) {
+internal fun OrderItemRow(item: OrderItemDto) {
     Row(verticalAlignment = Alignment.CenterVertically) {
         val (bg, drink) = categoryArtColors("咖啡")
         Box(
@@ -402,7 +405,7 @@ private fun OrderItemRow(item: OrderItemDto) {
 }
 
 @Composable
-private fun CouponOptionRow(
+internal fun CouponOptionRow(
     coupon: QuoteCouponDto,
     selected: Boolean,
     isBest: Boolean,
@@ -460,7 +463,7 @@ private fun CouponOptionRow(
 }
 
 @Composable
-private fun AmountRow(label: String, value: String, valueColor: Color = TextPrimary) {
+internal fun AmountRow(label: String, value: String, valueColor: Color = TextPrimary) {
     Row(modifier = Modifier.fillMaxWidth()) {
         Text(
             text = label,
@@ -473,7 +476,7 @@ private fun AmountRow(label: String, value: String, valueColor: Color = TextPrim
 }
 
 @Composable
-private fun TicketIcon() {
+internal fun TicketIcon() {
     Box(
         modifier = Modifier
             .size(28.dp)
@@ -490,7 +493,7 @@ private fun TicketIcon() {
 }
 
 @Composable
-private fun LoginPrompt(onGoLogin: () -> Unit) {
+internal fun LoginPrompt(onGoLogin: () -> Unit) {
     Column(
         modifier = Modifier
             .fillMaxSize()

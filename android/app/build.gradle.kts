@@ -82,8 +82,8 @@ tasks.withType<Test>().configureEach {
 }
 
 roborazzi {
-  // 截图输出到 android/screenshots/，随仓库提交
-  outputDir.set(file("../../screenshots"))
+  // 截图参考目录：android/screenshots/（随仓库提交）
+  outputDir.set(file(rootDir.path + "/screenshots"))
 }
 
 dependencies {

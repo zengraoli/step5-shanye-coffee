@@ -80,7 +80,7 @@ fun HomeScreen(
 }
 
 @Composable
-private fun HomeScreenContent(
+internal fun HomeScreenContent(
     state: HomeUiState,
     onStoreClick: () -> Unit,
     onStorePickerDismiss: () -> Unit,
@@ -221,7 +221,7 @@ private fun HomeScreenContent(
 }
 
 @Composable
-private fun PromoBanner(name: String, range: String) {
+internal fun PromoBanner(name: String, range: String) {
     Box(
         modifier = Modifier
             .fillMaxWidth()
@@ -269,7 +269,7 @@ private fun PromoBanner(name: String, range: String) {
 }
 
 @Composable
-private fun OrderTypeCard(title: String, desc: String, modifier: Modifier = Modifier, onClick: () -> Unit) {
+internal fun OrderTypeCard(title: String, desc: String, modifier: Modifier = Modifier, onClick: () -> Unit) {
     Column(
         modifier = modifier
             .clip(MaterialTheme.shapes.medium)
@@ -284,7 +284,7 @@ private fun OrderTypeCard(title: String, desc: String, modifier: Modifier = Modi
 }
 
 @Composable
-private fun FeaturedProductCard(product: ProductDto, onClick: () -> Unit) {
+internal fun FeaturedProductCard(product: ProductDto, onClick: () -> Unit) {
     val (bg, drink) = categoryArtColors(product.categoryName)
     Column(
         modifier = Modifier

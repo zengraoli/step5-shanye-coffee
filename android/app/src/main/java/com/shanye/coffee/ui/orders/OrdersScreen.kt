@@ -82,7 +82,7 @@ fun OrdersScreen(onOrderClick: (Long) -> Unit, onGoLogin: () -> Unit = {}) {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun OrdersScreenContent(
+internal fun OrdersScreenContent(
     state: OrdersUiState,
     onSelectStatus: (String) -> Unit,
     onRefresh: () -> Unit,

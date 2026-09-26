@@ -77,7 +77,7 @@ fun OrderScreen(onGoCheckout: () -> Unit) {
 }
 
 @Composable
-private fun OrderScreenContent(
+internal fun OrderScreenContent(
     state: OrderUiState,
     onSelectCategory: (Long) -> Unit,
     onSelectOrderType: (String) -> Unit,
@@ -206,7 +206,7 @@ private fun OrderScreenContent(
 }
 
 @Composable
-private fun OrderTypeToggle(orderType: String, onSelect: (String) -> Unit) {
+internal fun OrderTypeToggle(orderType: String, onSelect: (String) -> Unit) {
     Row(
         modifier = Modifier
             .clip(RoundedCornerShape(percent = 50))
@@ -233,7 +233,7 @@ private fun OrderTypeToggle(orderType: String, onSelect: (String) -> Unit) {
 }
 
 @Composable
-private fun ProductRow(product: ProductDto, promo: Boolean, onClick: () -> Unit) {
+internal fun ProductRow(product: ProductDto, promo: Boolean, onClick: () -> Unit) {
     val (bg, drink) = categoryArtColors(product.categoryName)
     Row(
         modifier = Modifier
@@ -322,7 +322,7 @@ private fun ProductRow(product: ProductDto, promo: Boolean, onClick: () -> Unit)
 }
 
 @Composable
-private fun TagPill(text: String, background: Color, color: Color) {
+internal fun TagPill(text: String, background: Color, color: Color) {
     Box(
         modifier = Modifier
             .clip(RoundedCornerShape(percent = 50))

@@ -74,7 +74,7 @@ fun LoginScreen(onLoggedIn: () -> Unit) {
 }
 
 @Composable
-private fun LoginScreenContent(
+internal fun LoginScreenContent(
     state: LoginUiState,
     onPhoneChange: (String) -> Unit,
     onCodeChange: (String) -> Unit,
@@ -310,7 +310,7 @@ private fun LoginScreenContent(
 
 /** 设计稿输入框：白底、22dp 圆角、细边框 */
 @Composable
-private fun DesignField(content: @Composable () -> Unit) {
+internal fun DesignField(content: @Composable () -> Unit) {
     Box(
         modifier = Modifier
             .fillMaxWidth()
