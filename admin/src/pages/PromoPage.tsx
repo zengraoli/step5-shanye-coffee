@@ -192,7 +192,7 @@ export function PromoPage() {
                   onValueChange={(value) => setStatus((value ?? 'inactive') as 'active' | 'inactive')}
                 >
                   <SelectTrigger id="promo-status">
-                    <SelectValue />
+                    <SelectValue>{status === 'active' ? '启用' : '停用'}</SelectValue>
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="active">启用</SelectItem>

@@ -378,21 +378,21 @@ export default {
 
 .slide__hill {
   position: absolute;
-  bottom: -60rpx;
-  width: 220rpx;
-  height: 220rpx;
-  border-radius: 32rpx;
+  bottom: 178rpx;
+  width: 160rpx;
+  height: 160rpx;
+  border-radius: 26rpx;
   transform: rotate(45deg);
 }
 
 .slide__hill--far {
-  left: 40rpx;
-  background: rgb(168 138 109 / 55%);
+  left: 300rpx;
+  background: rgb(168 138 109 / 40%);
 }
 
 .slide__hill--near {
-  left: 150rpx;
-  background: rgb(107 79 58 / 75%);
+  left: 390rpx;
+  background: rgb(107 79 58 / 45%);
 }
 
 .slide__cup {
@@ -481,8 +481,18 @@ export default {
 
 .slide__text {
   position: absolute;
-  left: 40rpx;
-  bottom: 36rpx;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  box-sizing: border-box;
+  padding: 48rpx 40rpx 28rpx;
+  background: linear-gradient(
+    180deg,
+    rgb(249 238 221 / 0%) 0%,
+    rgb(249 238 221 / 62%) 24%,
+    rgb(249 238 221 / 92%) 52%,
+    rgb(249 238 221 / 97%) 100%
+  );
   display: flex;
   flex-direction: column;
   gap: 6rpx;

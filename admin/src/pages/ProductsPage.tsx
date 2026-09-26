@@ -134,7 +134,9 @@ export function ProductsPage() {
               }}
             >
               <SelectTrigger id="filter-category">
-                <SelectValue placeholder="全部分类" />
+                <SelectValue>
+                  {(categoryId && categories.find((item) => String(item.id) === categoryId)?.name) || '全部分类'}
+                </SelectValue>
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">全部分类</SelectItem>
@@ -172,7 +174,9 @@ export function ProductsPage() {
               }}
             >
               <SelectTrigger id="filter-status">
-                <SelectValue placeholder="全部状态" />
+                <SelectValue>
+                  {(status && STATUS_FILTERS.find((item) => item.value === status)?.label) || '全部状态'}
+                </SelectValue>
               </SelectTrigger>
               <SelectContent>
                 {STATUS_FILTERS.map((item) => (
@@ -449,7 +453,9 @@ function ProductDialog({ open, product, categories, onClose, onSaved }: ProductD
               <Label htmlFor="product-category">分类</Label>
               <Select value={categoryId} onValueChange={(value) => setCategoryId(value ?? '')}>
                 <SelectTrigger id="product-category">
-                  <SelectValue placeholder="选择分类" />
+                  <SelectValue>
+                    {(categoryId && categories.find((item) => String(item.id) === categoryId)?.name) || '选择分类'}
+                  </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
                   {categories.map((category) => (

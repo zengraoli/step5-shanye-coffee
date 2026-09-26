@@ -486,6 +486,7 @@ const submit = async () => {
 }
 
 .remark {
+  box-sizing: border-box;
   width: 100%;
   border: 1rpx solid $color-line-strong;
   border-radius: $radius-sm;

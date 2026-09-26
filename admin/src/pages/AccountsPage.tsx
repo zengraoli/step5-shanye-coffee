@@ -334,7 +334,7 @@ function CreateAccountDialog({ open, stores, onClose, onCreated }: CreateAccount
                   onValueChange={(value) => setRole((value ?? 'staff') as AdminRole)}
                 >
                   <SelectTrigger id="account-role">
-                    <SelectValue />
+                    <SelectValue>{role === 'admin' ? '管理员' : '店员'}</SelectValue>
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="staff">店员</SelectItem>
@@ -350,7 +350,9 @@ function CreateAccountDialog({ open, stores, onClose, onCreated }: CreateAccount
                   disabled={role === 'staff'}
                 >
                   <SelectTrigger id="account-store">
-                    <SelectValue placeholder="选择门店" />
+                    <SelectValue>
+                      {(storeId && stores.find((item) => String(item.id) === storeId)?.name) || '不绑定'}
+                    </SelectValue>
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="none">不绑定</SelectItem>
@@ -455,7 +457,7 @@ function EditAccountDialog({ account, stores, onClose, onSaved }: EditAccountDia
             <Label htmlFor="edit-role">角色</Label>
             <Select value={role} onValueChange={(value) => setRole((value ?? 'staff') as AdminRole)}>
               <SelectTrigger id="edit-role">
-                <SelectValue />
+                <SelectValue>{role === 'admin' ? '管理员' : '店员'}</SelectValue>
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="staff">店员</SelectItem>
@@ -471,7 +473,9 @@ function EditAccountDialog({ account, stores, onClose, onSaved }: EditAccountDia
               disabled={role === 'staff'}
             >
               <SelectTrigger id="edit-store">
-                <SelectValue placeholder="选择门店" />
+                <SelectValue>
+                  {(storeId && stores.find((item) => String(item.id) === storeId)?.name) || '不绑定'}
+                </SelectValue>
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="none">不绑定</SelectItem>

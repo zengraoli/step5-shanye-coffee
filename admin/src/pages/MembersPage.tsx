@@ -129,7 +129,9 @@ export function MembersPage() {
               }}
             >
               <SelectTrigger id="member-level">
-                <SelectValue placeholder="全部等级" />
+                <SelectValue>
+                  {level === 'silver' ? '银卡' : level === 'gold' ? '金卡' : level === 'black' ? '黑卡' : '全部等级'}
+                </SelectValue>
               </SelectTrigger>
               <SelectContent>
                 {LEVEL_FILTERS.map((item) => (

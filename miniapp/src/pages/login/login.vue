@@ -229,6 +229,7 @@ const onSubmit = async () => {
 }
 
 .field__input {
+  box-sizing: border-box;
   width: 100%;
   border: 1rpx solid $color-line-strong;
   border-radius: $radius-md;

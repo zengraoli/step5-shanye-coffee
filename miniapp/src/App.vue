@@ -15,4 +15,11 @@ page {
   font-size: 28rpx;
   line-height: 1.6;
 }
+
+/* 输入类组件统一 border-box，避免 width:100% + padding 溢出容器 */
+input,
+textarea,
+picker {
+  box-sizing: border-box;
+}
 </style>

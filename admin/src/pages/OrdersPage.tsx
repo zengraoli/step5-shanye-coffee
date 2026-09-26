@@ -159,7 +159,9 @@ export function OrdersPage() {
                 }}
               >
                 <SelectTrigger id="order-store">
-                  <SelectValue placeholder="全部门店" />
+                  <SelectValue>
+                    {(storeId && stores.find((item) => String(item.id) === storeId)?.name) || '全部门店'}
+                  </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">全部门店</SelectItem>
@@ -182,7 +184,9 @@ export function OrdersPage() {
               }}
             >
               <SelectTrigger id="order-status">
-                <SelectValue placeholder="全部状态" />
+                <SelectValue>
+                  {(status && STATUS_FILTERS.find((item) => item.value === status)?.label) || '全部状态'}
+                </SelectValue>
               </SelectTrigger>
               <SelectContent>
                 {STATUS_FILTERS.map((item) => (

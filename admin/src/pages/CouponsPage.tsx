@@ -348,7 +348,7 @@ function CouponDialog({ open, coupon, onClose, onSaved }: CouponDialogProps) {
               onValueChange={(value) => setForm({ ...form, type: (value ?? 'full_reduction') as CouponType })}
             >
               <SelectTrigger id="coupon-type">
-                <SelectValue />
+                <SelectValue>{form.type === 'discount' ? '折扣券' : '满减券'}</SelectValue>
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="full_reduction">满减券</SelectItem>
