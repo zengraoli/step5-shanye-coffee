@@ -1,7 +1,7 @@
 # T31 首页与点单
 
 阶段：S6 android
-状态：待完成
+状态：已完成（v0.36，2026-09-26）
 设计稿：`docs/design/android/AD2-home.png`、`docs/design/android/AD3-order.png`
 
 ## 要做什么

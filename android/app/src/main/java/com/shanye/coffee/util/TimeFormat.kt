@@ -13,6 +13,7 @@ object TimeFormat {
     private val BEIJING: ZoneOffset = ZoneOffset.ofHours(8)
     private val DATE_TIME: DateTimeFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm").withZone(BEIJING)
     private val DATE: DateTimeFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd").withZone(BEIJING)
+    private val MONTH_DAY: DateTimeFormatter = DateTimeFormatter.ofPattern("M月dd日").withZone(BEIJING)
 
     /** UTC ISO8601 → 北京时间 yyyy-MM-dd HH:mm */
     fun dateTime(iso: String?): String = format(iso, DATE_TIME)
@@ -22,6 +23,9 @@ object TimeFormat {
 
     /** UTC ISO8601 → 北京时间 MM-dd HH:mm（列表紧凑展示） */
     fun short(iso: String?): String = format(iso, DateTimeFormatter.ofPattern("MM-dd HH:mm").withZone(BEIJING))
+
+    /** UTC ISO8601 → 北京时间 M月dd日（活动区间展示） */
+    fun monthDay(iso: String?): String = format(iso, MONTH_DAY)
 
     private fun format(iso: String?, formatter: DateTimeFormatter): String {
         if (iso.isNullOrBlank()) {

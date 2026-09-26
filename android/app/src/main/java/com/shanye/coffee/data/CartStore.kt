@@ -78,6 +78,10 @@ object CartStore {
     val totalFen: Int
         get() = _lines.value.sumOf { it.amount }
 
+    /** 应付金额：原价减去第二杯半价优惠（设计稿购物车条大数字） */
+    val payableFen: Int
+        get() = totalFen - promoDiscountFen()
+
     /**
      * 第二杯半价优惠金额（分）：同一适用商品的第 2、4… 件按半价计。
      * 与服务端 `secondHalfDiscountFen` 规则保持一致。

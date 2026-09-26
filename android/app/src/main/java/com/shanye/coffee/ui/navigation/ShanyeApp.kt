@@ -16,6 +16,7 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import androidx.navigation.navDeepLink
 import com.shanye.coffee.data.MemberSession
+import com.shanye.coffee.data.OrderSession
 import com.shanye.coffee.data.remote.dto.MemberProfileDto
 import com.shanye.coffee.ui.LocalAppContainer
 import com.shanye.coffee.ui.checkout.CheckoutScreen
@@ -23,6 +24,7 @@ import com.shanye.coffee.ui.home.HomeScreen
 import com.shanye.coffee.ui.login.LoginScreen
 import com.shanye.coffee.ui.order.OrderScreen
 import com.shanye.coffee.ui.orderdetail.OrderDetailScreen
+import com.shanye.coffee.ui.order.OrderScreen
 import com.shanye.coffee.ui.orders.OrdersScreen
 import com.shanye.coffee.ui.profile.ProfileScreen
 
@@ -55,12 +57,28 @@ fun ShanyeApp() {
                 composable(
                     route = Routes.HOME,
                     deepLinks = listOf(navDeepLink { uriPattern = "shanye://home" }),
-                ) { HomeScreen() }
+                ) {
+                    HomeScreen(
+                        onGoOrder = { type ->
+                            OrderSession.setOrderType(type)
+                            navController.navigate(Routes.ORDER) { launchSingleTop = true }
+                        },
+                        onProductClick = {
+                            navController.navigate(Routes.ORDER) { launchSingleTop = true }
+                        },
+                    )
+                }
 
                 composable(
                     route = Routes.ORDER,
                     deepLinks = listOf(navDeepLink { uriPattern = "shanye://order" }),
-                ) { OrderScreen() }
+                ) {
+                    OrderScreen(
+                        onGoCheckout = {
+                            navController.navigate(Routes.CHECKOUT)
+                        },
+                    )
+                }
 
                 composable(
                     route = Routes.ORDERS,
@@ -104,7 +122,10 @@ fun ShanyeApp() {
                     deepLinks = listOf(navDeepLink { uriPattern = "shanye://order-detail/{orderId}" }),
                 ) { entry ->
                     val orderId = entry.arguments?.getLong(Routes.ARG_ORDER_ID) ?: 0L
-                    OrderDetailScreen(orderId = orderId)
+                    OrderDetailScreen(
+                        orderId = orderId,
+                        onBack = { navController.popBackStack() },
+                    )
                 }
             }
         }
