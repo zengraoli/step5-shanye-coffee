@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 自绘启动图标：山形 + 太阳（矢量，无外部资源） -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path
+        android:fillColor="#E9B872"
+        android:pathData="M76,34 m-9,0 a9,9 0 1,0 18,0 a9,9 0 1,0 -18,0" />
+    <path
+        android:fillColor="#F6F1E7"
+        android:pathData="M30,72 L48,42 L62,62 L72,50 L86,72 Z" />
+    <path
+        android:fillColor="#F6F1E7"
+        android:pathData="M40,78 L68,78 L68,82 L40,82 Z" />
+</vector>

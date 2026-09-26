@@ -1,0 +1,111 @@
+package com.shanye.coffee.ui.navigation
+
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.Scaffold
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Modifier
+import androidx.navigation.NavHostController
+import androidx.navigation.NavType
+import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.composable
+import androidx.navigation.compose.rememberNavController
+import androidx.navigation.navArgument
+import androidx.navigation.navDeepLink
+import com.shanye.coffee.ui.checkout.CheckoutScreen
+import com.shanye.coffee.ui.home.HomeScreen
+import com.shanye.coffee.ui.login.LoginScreen
+import com.shanye.coffee.ui.order.OrderScreen
+import com.shanye.coffee.ui.orderdetail.OrderDetailScreen
+import com.shanye.coffee.ui.orders.OrdersScreen
+import com.shanye.coffee.ui.profile.ProfileScreen
+
+/** 应用主导航：单 Activity + Navigation Compose，底部四个 Tab */
+@Composable
+fun ShanyeApp() {
+    val navController = rememberNavController()
+
+    Scaffold(
+        bottomBar = { ShanyeBottomBar(navController) },
+        containerColor = androidx.compose.material3.MaterialTheme.colorScheme.background,
+    ) { innerPadding ->
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(innerPadding),
+        ) {
+            NavHost(navController = navController, startDestination = Routes.HOME) {
+                composable(
+                    route = Routes.HOME,
+                    deepLinks = listOf(navDeepLink { uriPattern = "shanye://home" }),
+                ) { HomeScreen() }
+
+                composable(
+                    route = Routes.ORDER,
+                    deepLinks = listOf(navDeepLink { uriPattern = "shanye://order" }),
+                ) { OrderScreen() }
+
+                composable(
+                    route = Routes.ORDERS,
+                    deepLinks = listOf(navDeepLink { uriPattern = "shanye://orders" }),
+                ) { OrdersScreen() }
+
+                composable(
+                    route = Routes.PROFILE,
+                    deepLinks = listOf(navDeepLink { uriPattern = "shanye://profile" }),
+                ) { ProfileScreen() }
+
+                composable(
+                    route = Routes.LOGIN,
+                    deepLinks = listOf(navDeepLink { uriPattern = "shanye://login" }),
+                ) { LoginScreen() }
+
+                composable(
+                    route = Routes.CHECKOUT,
+                    deepLinks = listOf(navDeepLink { uriPattern = "shanye://checkout" }),
+                ) { CheckoutScreen() }
+
+                composable(
+                    route = "${Routes.ORDER_DETAIL}?${Routes.ARG_ORDER_ID}={${Routes.ARG_ORDER_ID}}",
+                    arguments = listOf(
+                        navArgument(Routes.ARG_ORDER_ID) { type = NavType.LongType },
+                    ),
+                    deepLinks = listOf(navDeepLink { uriPattern = "shanye://order-detail/{orderId}" }),
+                ) { entry ->
+                    val orderId = entry.arguments?.getLong(Routes.ARG_ORDER_ID) ?: 0L
+                    OrderDetailScreen(orderId = orderId)
+                }
+            }
+        }
+    }
+}
+
+/** 导航辅助（供各页面跳转使用） */
+object ShanyeNavigator {
+    lateinit var controller: NavHostController
+
+    fun bind(controller: NavHostController) {
+        this.controller = controller
+    }
+
+    fun goLogin() {
+        controller.navigate(Routes.LOGIN)
+    }
+
+    fun goCheckout() {
+        controller.navigate(Routes.CHECKOUT)
+    }
+
+    fun goOrders() {
+        controller.navigate(Routes.ORDERS)
+    }
+
+    fun goOrderDetail(orderId: Long) {
+        controller.navigate(Routes.orderDetail(orderId))
+    }
+
+    fun back() {
+        controller.popBackStack()
+    }
+}
