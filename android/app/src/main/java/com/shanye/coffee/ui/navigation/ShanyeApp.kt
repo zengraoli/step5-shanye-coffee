@@ -112,7 +112,15 @@ fun ShanyeApp() {
                 composable(
                     route = Routes.CHECKOUT,
                     deepLinks = listOf(navDeepLink { uriPattern = "shanye://checkout" }),
-                ) { CheckoutScreen() }
+                ) {
+                    CheckoutScreen(
+                        onPaid = { orderId ->
+                            navController.navigate(Routes.orderDetail(orderId))
+                        },
+                        onBack = { navController.popBackStack() },
+                        onGoLogin = { navController.navigate(Routes.LOGIN) },
+                    )
+                }
 
                 composable(
                     route = "${Routes.ORDER_DETAIL}?${Routes.ARG_ORDER_ID}={${Routes.ARG_ORDER_ID}}",
