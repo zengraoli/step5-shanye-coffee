@@ -256,7 +256,8 @@ function CreateAccountDialog({ open, stores, onClose, onCreated }: CreateAccount
     setUsername('')
     setPassword('')
     setRole('staff')
-    setStoreId(stores[0] ? String(stores[0].id) : '')
+    // 不预置门店：避免“正常操作新建的店员都绑到第一家门店”
+    setStoreId('')
     setNickname('')
     setError('')
     setCreatedPassword('')
