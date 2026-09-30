@@ -243,3 +243,83 @@ test('新增账号：storeId 传 true、密码为纯空格都被拒绝', async (
     await app.close()
   }
 })
+
+test('轻食与周边不需要杯型温度糖度，后台可配置规格组', async () => {
+  const { app, db } = await createTestApp()
+  forceStoreOpen(db, 1)
+  const adminToken = await loginAdmin(app, 'admin')
+  const token = await loginMember(app, '13800000001')
+  try {
+    // 商品 13 = 提拉米苏杯（轻食）：接口返回空规格组
+    const detail = await app.inject({ method: 'GET', url: '/api/v1/products/13' })
+    assert.equal(detail.statusCode, 200, detail.body)
+    assert.deepEqual(detail.json().data.specKeys, [])
+    assert.deepEqual(detail.json().data.specs, [])
+
+    // 不传规格也能下单
+    const order = await app.inject({
+      method: 'POST',
+      url: '/api/v1/orders',
+      headers: { authorization: `Bearer ${token}` },
+      payload: { storeId: 1, orderType: 'takeout', items: [{ productId: 13, spec: {}, quantity: 1 }] },
+    })
+    assert.equal(order.statusCode, 201, order.body)
+    assert.equal(order.json().data.items[0].specText, '标准装')
+
+    // 传了规格反而被拒绝
+    const withSpec = await app.inject({
+      method: 'POST',
+      url: '/api/v1/orders',
+      headers: { authorization: `Bearer ${token}` },
+      payload: {
+        storeId: 1,
+        orderType: 'takeout',
+        items: [{ productId: 13, spec: { cup: 'medium', temp: 'ice', sugar: 'less' }, quantity: 1 }],
+      },
+    })
+    assert.equal(withSpec.statusCode, 400, withSpec.body)
+    assert.equal(withSpec.json().message, '该商品没有可配置规格')
+
+    // 后台可把商品 1 改成“只要杯型”
+    const patched = await app.inject({
+      method: 'PUT',
+      url: '/api/v1/admin/products/1',
+      headers: { authorization: `Bearer ${adminToken}` },
+      payload: { specGroups: ['cup'] },
+    })
+    assert.equal(patched.statusCode, 200, patched.body)
+    assert.deepEqual(patched.json().data.specKeys, ['cup'])
+
+    // 只传杯型即可下单，价格含大杯加价
+    const bigCup = await app.inject({
+      method: 'POST',
+      url: '/api/v1/orders',
+      headers: { authorization: `Bearer ${token}` },
+      payload: { storeId: 1, orderType: 'takeout', items: [{ productId: 1, spec: { cup: 'large' }, quantity: 1 }] },
+    })
+    assert.equal(bigCup.statusCode, 201, bigCup.body)
+    assert.equal(bigCup.json().data.items[0].unitPrice, 3500)
+    assert.equal(bigCup.json().data.items[0].specText, '大杯')
+
+    // 非法的规格组 key 被拒绝
+    const bad = await app.inject({
+      method: 'PUT',
+      url: '/api/v1/admin/products/1',
+      headers: { authorization: `Bearer ${adminToken}` },
+      payload: { specGroups: ['cup', 'size'] },
+    })
+    assert.equal(bad.statusCode, 400)
+
+    // 新增商品默认继承同分类配置
+    const created = await app.inject({
+      method: 'POST',
+      url: '/api/v1/admin/products',
+      headers: { authorization: `Bearer ${adminToken}` },
+      payload: { categoryId: 1, name: '测试新品拿铁', basePrice: 3000 },
+    })
+    assert.equal(created.statusCode, 201, created.body)
+    assert.deepEqual(created.json().data.specKeys, ['cup'])
+  } finally {
+    await app.close()
+  }
+})

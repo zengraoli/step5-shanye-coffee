@@ -35,6 +35,7 @@ export const MIGRATIONS: string[] = [
     image TEXT NOT NULL DEFAULT '',
     on_sale INTEGER NOT NULL DEFAULT 1,
     sold_out INTEGER NOT NULL DEFAULT 0,
+    spec_groups TEXT NOT NULL DEFAULT '["cup","temp","sugar"]',
     sort INTEGER NOT NULL DEFAULT 0,
     created_at TEXT NOT NULL
   )`,
@@ -168,6 +169,7 @@ export function migrateSchema(db: {
     db.exec('ALTER TABLE orders ADD COLUMN promo_discount_fen INTEGER NOT NULL DEFAULT 0')
   }
   addStoreManualClosed(db)
+  addProductSpecGroups(db)
   addMemberCouponSnapshotColumns(db)
 }
 
@@ -181,6 +183,16 @@ function addColumn(db: { exec: (sql: string) => unknown }, table: string, column
  * 会员券快照字段：领取时把券模板的名称与优惠条件复制到会员券上，
  * 之后后台编辑券模板不会影响已领取的券（弹窗承诺“对新领取的券生效”）。
  */
+function addProductSpecGroups(db: {
+  prepare: (sql: string) => { all: () => unknown[] }
+  exec: (sql: string) => unknown
+}): void {
+  const columns = db.prepare('PRAGMA table_info(products)').all() as { name: string }[]
+  addColumn(db, 'products', 'spec_groups', "TEXT NOT NULL DEFAULT '[\"cup\",\"temp\",\"sugar\"]'", columns)
+  // 轻食与周边默认不需要杯型 / 温度 / 糖度
+  db.exec(`UPDATE products SET spec_groups = '[]' WHERE category_id IN (SELECT id FROM categories WHERE name IN ('轻食', '周边'))`)
+}
+
 function addStoreManualClosed(db: {
   prepare: (sql: string) => { all: () => unknown[] }
   exec: (sql: string) => unknown

@@ -139,20 +139,17 @@ test('后台可修改活动配置并立即生效', async () => {
 
     // 生效后：商品 13 两杯有优惠，商品 1 两杯无优惠
     const token = await loginMember(app, '13800099010')
-    const quote = async (productId: number) =>
+    // 商品 13（提拉米苏杯，轻食）无需规格；商品 1（山野拿铁）需要完整规格
+    const quote = async (productId: number, spec: Record<string, string>) =>
       app.inject({
         method: 'POST',
         url: '/api/v1/orders/quote',
         headers: { authorization: `Bearer ${token}` },
-        payload: {
-          storeId: 1,
-          orderType: 'takeout',
-          items: [{ productId, spec: { cup: 'medium', temp: 'ice', sugar: 'less' }, quantity: 2 }],
-        },
+        payload: { storeId: 1, orderType: 'takeout', items: [{ productId, spec, quantity: 2 }] },
       })
-    const promoQuote = await quote(13)
+    const promoQuote = await quote(13, {})
     assert.equal(promoQuote.json().data.promoDiscountFen, 900) // 1800 / 2
-    const normalQuote = await quote(1)
+    const normalQuote = await quote(1, { cup: 'medium', temp: 'ice', sugar: 'less' })
     assert.equal(normalQuote.json().data.promoDiscountFen, 0)
 
     // 恢复种子配置，避免影响其他测试的共享状态

@@ -43,11 +43,44 @@ export const SPEC_GROUPS: SpecGroup[] = [
   },
 ]
 
+/** 全部规格组的 key */
+export const ALL_SPEC_KEYS: string[] = SPEC_GROUPS.map((group) => group.key)
+
+/** 默认规格组：饮品需要杯型 / 温度 / 糖度 */
+export const DEFAULT_SPEC_KEYS: string[] = ALL_SPEC_KEYS
+
 export type SpecSelection = Record<string, string>
 
-/** 校验规格选择是否合法 */
-export function isValidSpec(spec: SpecSelection): boolean {
-  for (const group of SPEC_GROUPS) {
+/** 从 key 列表取出规格组定义；非法 key 直接忽略 */
+export function specGroupsFor(keys: readonly string[] | null | undefined): SpecGroup[] {
+  if (keys === null || keys === undefined) {
+    return SPEC_GROUPS
+  }
+  return SPEC_GROUPS.filter((group) => keys.includes(group.key))
+}
+
+/** 解析商品上存储的规格组配置 */
+export function parseSpecGroups(raw: string | null | undefined): string[] {
+  if (raw === null || raw === undefined || raw === '') {
+    return DEFAULT_SPEC_KEYS
+  }
+  try {
+    const parsed = JSON.parse(raw) as unknown
+    if (!Array.isArray(parsed)) {
+      return DEFAULT_SPEC_KEYS
+    }
+    const keys = parsed.filter((item): item is string => typeof item === 'string')
+    const known = ALL_SPEC_KEYS.filter((key) => keys.includes(key))
+    // 保持注册表顺序，去重
+    return known
+  } catch {
+    return DEFAULT_SPEC_KEYS
+  }
+}
+
+/** 校验规格选择是否合法（按该商品启用的规格组） */
+export function isValidSpec(spec: SpecSelection, groups: readonly SpecGroup[] = SPEC_GROUPS): boolean {
+  for (const group of groups) {
     const value = spec[group.key]
     if (!value || !group.options.some((option) => option.value === value)) {
       return false
@@ -57,9 +90,9 @@ export function isValidSpec(spec: SpecSelection): boolean {
 }
 
 /** 根据规格计算加价（分） */
-export function specExtra(spec: SpecSelection): number {
+export function specExtra(spec: SpecSelection, groups: readonly SpecGroup[] = SPEC_GROUPS): number {
   let extra = 0
-  for (const group of SPEC_GROUPS) {
+  for (const group of groups) {
     const value = spec[group.key]
     const option = group.options.find((item) => item.value === value)
     if (option) {
@@ -70,14 +103,14 @@ export function specExtra(spec: SpecSelection): number {
 }
 
 /** 规格的可读文案，如“大杯 / 冰 / 少糖” */
-export function specLabel(spec: SpecSelection): string {
+export function specLabel(spec: SpecSelection, groups: readonly SpecGroup[] = SPEC_GROUPS): string {
   const parts: string[] = []
-  for (const group of SPEC_GROUPS) {
+  for (const group of groups) {
     const value = spec[group.key]
     const option = group.options.find((item) => item.value === value)
     if (option) {
       parts.push(option.label)
     }
   }
-  return parts.join(' / ')
+  return parts.length > 0 ? parts.join(' / ') : '标准装'
 }

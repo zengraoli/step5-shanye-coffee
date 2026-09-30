@@ -2,7 +2,7 @@ import type { FastifyInstance } from 'fastify'
 import type { Db } from '../db/index.js'
 import { fail } from '../lib/errors.js'
 import { sendOk } from '../lib/response.js'
-import { SPEC_GROUPS } from '../lib/specs.js'
+import { ALL_SPEC_KEYS, parseSpecGroups, specGroupsFor, SPEC_GROUPS } from '../lib/specs.js'
 import { adminGuard, adminOnly } from '../lib/guards.js'
 import { readPagination } from '../lib/pagination.js'
 import { isSoldOutAtStore, setStoreSoldOut, soldOutStoreIds } from './store-status.js'
@@ -17,6 +17,7 @@ interface ProductRow {
   image: string
   on_sale: number
   sold_out: number
+  spec_groups: string
   sort: number
 }
 
@@ -31,6 +32,7 @@ function serializeProduct(
   categoryName: string,
   db?: Db,
 ) {
+  const groups = specGroupsFor(parseSpecGroups(product.spec_groups))
   const globalSoldOut = product.sold_out === 1
   const storeSoldOut = product.store_sold_out === 1
   return {
@@ -48,7 +50,9 @@ function serializeProduct(
     /** 被单独标记售罄的门店 id 列表 */
     soldOutStoreIds: db ? soldOutStoreIds(db, product.id) : [],
     sort: product.sort,
-    specs: SPEC_GROUPS,
+    /** 该商品需要选择的规格组（轻食 / 周边为空数组） */
+    specs: groups,
+    specKeys: groups.map((group) => group.key),
   }
 }
 
@@ -257,10 +261,11 @@ export async function productRoutes(app: FastifyInstance): Promise<void> {
         if (basePrice > 100000000) {
           fail('BAD_REQUEST', '商品价格不能超过 100 万元')
         }
+        const specGroups = readSpecGroups(db, categoryId, payload.specGroups)
         const info = db
           .prepare(
-            `INSERT INTO products (category_id, name, subtitle, description, base_price, image, on_sale, sold_out, sort, created_at)
-             VALUES (?, ?, ?, ?, ?, ?, 1, 0, ?, ?)`,
+            `INSERT INTO products (category_id, name, subtitle, description, base_price, image, on_sale, sold_out, spec_groups, sort, created_at)
+             VALUES (?, ?, ?, ?, ?, ?, 1, 0, ?, ?, ?)`,
           )
           .run(
             categoryId,
@@ -269,6 +274,7 @@ export async function productRoutes(app: FastifyInstance): Promise<void> {
             typeof payload.description === 'string' ? payload.description.trim() : '',
             basePrice,
             typeof payload.image === 'string' ? payload.image.trim() : '',
+            specGroups,
             Number.isInteger(Number(payload.sort)) ? Number(payload.sort) : 0,
             new Date().toISOString(),
           )
@@ -343,6 +349,11 @@ export async function productRoutes(app: FastifyInstance): Promise<void> {
             }
             updates.push('sort = ?')
             params.push(sort)
+          }
+          if (payload.specGroups !== undefined) {
+            const keys = readSpecKeys(payload.specGroups)
+            updates.push('spec_groups = ?')
+            params.push(JSON.stringify(keys))
           }
           if (updates.length === 0) {
             fail('BAD_REQUEST', '没有需要更新的字段')
@@ -431,4 +442,30 @@ interface ProductPayload {
   basePrice?: number
   image?: string
   sort?: number
+  /** 需要选择的规格组 key 列表，如 ["cup","temp","sugar"]；轻食 / 周边传 [] */
+  specGroups?: unknown
+}
+
+/** 校验规格组配置，返回规范化后的 key 列表 */
+function readSpecKeys(value: unknown): string[] {
+  if (!Array.isArray(value)) {
+    fail('BAD_REQUEST', '规格组必须为数组')
+  }
+  for (const item of value) {
+    if (typeof item !== 'string' || !ALL_SPEC_KEYS.includes(item)) {
+      fail('BAD_REQUEST', '规格组只能是 cup / temp / sugar')
+    }
+  }
+  return ALL_SPEC_KEYS.filter((key) => value.includes(key))
+}
+
+/** 新增商品时确定规格组：显式传入优先，否则继承同分类已有商品的配置 */
+function readSpecGroups(db: Db, categoryId: number, value: unknown): string {
+  if (value !== undefined) {
+    return JSON.stringify(readSpecKeys(value))
+  }
+  const sibling = db
+    .prepare('SELECT spec_groups FROM products WHERE category_id = ? ORDER BY id LIMIT 1')
+    .get(categoryId) as unknown as { spec_groups: string } | undefined
+  return JSON.stringify(parseSpecGroups(sibling?.spec_groups))
 }

@@ -221,7 +221,7 @@ test('不满足使用条件的券手动选择时报错', async () => {
       url: '/api/v1/coupons/1/claim',
       headers: { authorization: `Bearer ${token}` },
     })
-    const smallCart = [{ productId: 13, spec: { cup: 'medium', temp: 'ice', sugar: 'standard' }, quantity: 1 }]
+    const smallCart = [{ productId: 13, spec: {}, quantity: 1 }]
     const quote = await app.inject({
       method: 'POST',
       url: '/api/v1/orders/quote',

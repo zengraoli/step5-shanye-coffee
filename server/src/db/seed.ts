@@ -86,6 +86,14 @@ interface ProductSeed {
   sort: number
 }
 
+/** 不需要杯型 / 温度 / 糖度的分类 */
+const NO_SPEC_CATEGORIES = new Set(['轻食', '周边'])
+
+/** 该分类下商品的默认规格组 */
+function DEFAULT_SPEC_KEYS_FOR(category: string): string {
+  return JSON.stringify(NO_SPEC_CATEGORIES.has(category) ? [] : ['cup', 'temp', 'sugar'])
+}
+
 const PRODUCTS: ProductSeed[] = [
   // 咖啡
   { category: '咖啡', name: '山野拿铁', subtitle: '招牌', description: '云南SOE浓缩与冷藏鲜奶的柔和平衡，坚果与可可尾韵。', base_price: 3200, sort: 1 },
@@ -177,8 +185,8 @@ export function seed(db: DatabaseSync): SeededCredential[] {
   )
   const insertCategory = db.prepare('INSERT INTO categories (name, sort) VALUES (?, ?)')
   const insertProduct = db.prepare(
-    `INSERT INTO products (category_id, name, subtitle, description, base_price, image, on_sale, sold_out, sort, created_at)
-     VALUES (?, ?, ?, ?, ?, '', 1, 0, ?, ?)`,
+    `INSERT INTO products (category_id, name, subtitle, description, base_price, image, on_sale, sold_out, spec_groups, sort, created_at)
+     VALUES (?, ?, ?, ?, ?, '', 1, 0, ?, ?, ?)`,
   )
   const insertCoupon = db.prepare(
     `INSERT INTO coupons (name, type, threshold_fen, reduce_fen, discount_percent, max_reduce_fen, valid_days, total, remaining, status, created_at)
@@ -204,7 +212,16 @@ export function seed(db: DatabaseSync): SeededCredential[] {
     if (categoryId === undefined) {
       throw new Error(`未知分类：${product.category}`)
     }
-    insertProduct.run(categoryId, product.name, product.subtitle, product.description, product.base_price, product.sort, createdAt)
+    insertProduct.run(
+      categoryId,
+      product.name,
+      product.subtitle,
+      product.description,
+      product.base_price,
+      DEFAULT_SPEC_KEYS_FOR(product.category),
+      product.sort,
+      createdAt,
+    )
   }
 
   for (const coupon of COUPONS) {
