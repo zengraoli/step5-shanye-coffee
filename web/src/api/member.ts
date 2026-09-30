@@ -24,6 +24,22 @@ export interface MemberCoupon {
   usedAt: string | null
 }
 
+/** 可领取的券模板（公开接口返回） */
+export interface ClaimableCoupon {
+  id: number
+  name: string
+  type: 'full_reduction' | 'discount'
+  typeText: string
+  thresholdFen: number
+  reduceFen: number
+  discountPercent: number
+  maxReduceFen: number
+  validDays: number
+  total: number
+  remaining: number
+  status: 'active' | 'inactive'
+}
+
 export interface PointsLog {
   id: number
   change: number
@@ -99,6 +115,16 @@ export function fetchPointsSummary(): Promise<PointsSummary> {
 export function fetchMemberCoupons(status?: 'unused' | 'used' | 'expired'): Promise<MemberCoupon[]> {
   const query = status ? `?status=${status}` : ''
   return apiFetch<MemberCoupon[]>(`/api/v1/members/me/coupons${query}`)
+}
+
+/** 可领取的券模板（无需登录，带 token 时自动附带） */
+export function fetchClaimableCoupons(): Promise<ClaimableCoupon[]> {
+  return apiFetch<ClaimableCoupon[]>('/api/v1/coupons')
+}
+
+/** 领取优惠券（需要会员 token） */
+export function claimCoupon(id: number): Promise<MemberCoupon> {
+  return apiFetch<MemberCoupon>(`/api/v1/coupons/${id}/claim`, { method: 'POST', body: {} })
 }
 
 /** 我的订单 */

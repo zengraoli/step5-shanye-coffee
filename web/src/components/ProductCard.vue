@@ -1,32 +1,47 @@
 <script setup lang="ts">
+import { computed } from 'vue'
 import ProductArt from './ProductArt.vue'
 import type { Product } from '@/api/catalog'
 import { formatMoney } from '@/utils/format'
+import { findCupGroup, hasCupUpcharge } from '@/utils/spec'
 
-defineProps<{
+const props = defineProps<{
   product: Product
   featured?: boolean
   /** 是否参与第二杯半价活动 */
   promo?: boolean
 }>()
+
+/** 跳转商品详情 */
+const detailRoute = computed(() => ({ name: 'product' as const, params: { id: props.product.id } }))
+
+/** 大杯加价角标：仅当规格含杯型且存在加价格式时展示（轻食 / 周边为 []，不标） */
+const showCupBadge = computed(() => hasCupUpcharge(props.product.specs))
+const cupBadgeText = computed(() => {
+  const cup = findCupGroup(props.product.specs)
+  const top = cup?.options.reduce((max, option) => Math.max(max, option.extra), 0) ?? 0
+  return `大杯 +${formatMoney(top)}`
+})
 </script>
 
 <template>
   <article class="product-card" :class="{ 'product-card--featured': featured }">
-    <div class="product-card__art">
-      <ProductArt :category="product.categoryName" :size="96" />
-      <span v-if="featured" class="product-card__badge">当季推荐</span>
-      <span v-else-if="promo" class="product-card__promo">第二杯半价</span>
-      <span v-if="product.soldOut" class="product-card__mask">已售罄</span>
-    </div>
-    <div class="product-card__body">
-      <h3 class="product-card__name">{{ product.name }}</h3>
-      <p class="product-card__subtitle">{{ product.subtitle || product.description }}</p>
-      <div class="product-card__meta">
-        <span class="price">{{ formatMoney(product.basePrice) }}</span>
-        <span class="product-card__specs">大杯 +¥3.00</span>
+    <RouterLink :to="detailRoute" class="product-card__link">
+      <div class="product-card__art">
+        <ProductArt :category="product.categoryName" :size="96" />
+        <span v-if="featured" class="product-card__badge">当季推荐</span>
+        <span v-else-if="promo" class="product-card__promo">第二杯半价</span>
+        <span v-if="product.soldOut" class="product-card__mask">已售罄</span>
       </div>
-    </div>
+      <div class="product-card__body">
+        <h3 class="product-card__name">{{ product.name }}</h3>
+        <p class="product-card__subtitle">{{ product.subtitle || product.description }}</p>
+        <div class="product-card__meta">
+          <span class="price">{{ formatMoney(product.basePrice) }}</span>
+          <span v-if="showCupBadge" class="product-card__specs">{{ cupBadgeText }}</span>
+        </div>
+      </div>
+    </RouterLink>
   </article>
 </template>
 
@@ -40,6 +55,13 @@ defineProps<{
   background: var(--color-surface);
   box-shadow: var(--shadow-sm);
   transition: transform 0.25s ease, box-shadow 0.25s ease, border-color 0.25s ease;
+}
+
+.product-card__link {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  color: inherit;
 }
 
 .product-card:hover {
@@ -138,5 +160,33 @@ defineProps<{
 .product-card__specs {
   font-size: var(--text-xs);
   color: var(--color-text-faint);
+}
+
+/* 小屏（390 宽）：收紧卡片内边距与字号，避免换行溢出 */
+@media (max-width: 480px) {
+  .product-card__art {
+    padding-block: var(--space-4);
+  }
+
+  .product-card__body {
+    gap: var(--space-1);
+    padding: var(--space-3) var(--space-4) var(--space-4);
+  }
+
+  .product-card__name {
+    font-size: var(--text-base);
+  }
+
+  .product-card__subtitle {
+    font-size: var(--text-xs);
+  }
+
+  .product-card__meta {
+    padding-top: var(--space-1);
+  }
+
+  .product-card__meta .price {
+    font-size: var(--text-lg);
+  }
 }
 </style>

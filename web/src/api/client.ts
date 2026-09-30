@@ -70,6 +70,55 @@ export function clearSession(): void {
   localStorage.removeItem(PROFILE_KEY)
 }
 
+/* ---------- 401 集中处理 ---------- */
+
+/** 服务端统一的“未登录 / 登录已过期”错误码 */
+export const UNAUTHORIZED_CODE = 10002
+
+/** 401 回调入参 */
+export interface UnauthorizedInfo {
+  status: number
+  code: number
+  message: string
+}
+
+type UnauthorizedHandler = (info: UnauthorizedInfo) => void
+
+let unauthorizedHandler: UnauthorizedHandler | null = null
+/** 同一轮请求中已通知过 401，避免批量请求重复跳登录 */
+let unauthorizedNotified = false
+
+/**
+ * 注册全局 401 处理器（跳登录页等）。
+ * 用模块级回调而不是直接 import router，避免 client ↔ router/composables 循环依赖。
+ */
+export function setUnauthorizedHandler(handler: UnauthorizedHandler | null): void {
+  unauthorizedHandler = handler
+  unauthorizedNotified = false
+}
+
+/** 是否为“登录态失效”：HTTP 401 或业务码 10002 */
+export function isUnauthorized(status: number, code: number): boolean {
+  return status === 401 || code === UNAUTHORIZED_CODE
+}
+
+/** 统一处理 401：清本地会话并通知外部（同一时刻只通知一次，避免批量请求重复跳登录） */
+function handleUnauthorized(status: number, body: ApiErr): void {
+  clearSession()
+  const handler = unauthorizedHandler
+  if (!handler || unauthorizedNotified) {
+    return
+  }
+  unauthorizedNotified = true
+  try {
+    handler({ status, code: body.code, message: body.message })
+  } finally {
+    setTimeout(() => {
+      unauthorizedNotified = false
+    }, 0)
+  }
+}
+
 interface RequestOptions {
   method?: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE'
   body?: unknown
@@ -100,6 +149,13 @@ export async function apiFetch<T>(path: string, options: RequestOptions = {}): P
   try {
     payload = (await response.json()) as ApiOk<T> | ApiErr
   } catch {
+    if (isUnauthorized(response.status, 0)) {
+      handleUnauthorized(response.status, {
+        code: UNAUTHORIZED_CODE,
+        data: null,
+        message: '未登录或登录已过期',
+      })
+    }
     throw new ApiError(response.status, {
       code: 10999,
       data: null,
@@ -107,6 +163,9 @@ export async function apiFetch<T>(path: string, options: RequestOptions = {}): P
     })
   }
   if (payload.code !== 0) {
+    if (isUnauthorized(response.status, payload.code)) {
+      handleUnauthorized(response.status, payload as ApiErr)
+    }
     throw new ApiError(response.status, payload as ApiErr)
   }
   return (payload as ApiOk<T>).data

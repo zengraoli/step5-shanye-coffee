@@ -1,12 +1,15 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { useAuth } from '@/composables/useAuth'
+import { toAuthRefreshError, useAuth } from '@/composables/useAuth'
 import { ApiError } from '@/api/client'
 import {
+  claimCoupon,
+  fetchClaimableCoupons,
   fetchMemberCoupons,
   fetchMemberOrders,
   fetchPointsSummary,
+  type ClaimableCoupon,
   type MemberCoupon,
   type MemberOrder,
   type PointsSummary,
@@ -17,11 +20,17 @@ const router = useRouter()
 const { state, logout } = useAuth()
 
 const loading = ref(true)
+/** '' 正常 / auth 登录态失效 / network 网络或服务不可用 / other 其他错误 */
+const errorKind = ref<'' | 'auth' | 'network' | 'other'>('')
 const error = ref('')
 const summary = ref<PointsSummary | null>(null)
 const coupons = ref<MemberCoupon[]>([])
 const orders = ref<MemberOrder[]>([])
-const activeTab = ref<'orders' | 'points' | 'coupons'>('orders')
+const claimable = ref<ClaimableCoupon[]>([])
+const activeTab = ref<'orders' | 'points' | 'coupons' | 'claim'>('orders')
+/** 领取中的券模板 id，避免重复点击 */
+const claiming = ref<number | null>(null)
+const claimTip = ref('')
 
 const COUPON_TABS: { value: '' | 'unused' | 'used' | 'expired'; label: string }[] = [
   { value: '', label: '全部' },
@@ -31,6 +40,18 @@ const COUPON_TABS: { value: '' | 'unused' | 'used' | 'expired'; label: string }[
 ]
 
 const couponTab = ref<'' | 'unused' | 'used' | 'expired'>('')
+
+/** 已领取的券模板 id 集合（会员券接口按 couponId 关联模板） */
+const claimedTemplateIds = computed(() => new Set(coupons.value.map((item) => item.couponId)))
+
+/** 某张模板是否已领取 */
+const isClaimed = (id: number): boolean => claimedTemplateIds.value.has(id)
+
+/** 模板的优惠文案 */
+const couponBenefitText = (template: ClaimableCoupon): string =>
+  template.type === 'discount'
+    ? `${(template.discountPercent / 10).toFixed(1)} 折${template.maxReduceFen > 0 ? ` · 最高减 ${formatMoney(template.maxReduceFen)}` : ''}`
+    : `减 ${formatMoney(template.reduceFen)}`
 
 const progressPercent = () => {
   const profile = state.profile
@@ -45,8 +66,18 @@ const progressPercent = () => {
   return Math.min(100, Math.round((current / (current + next)) * 100))
 }
 
+/** 领券中心：可领取模板（无需登录）/ 我的优惠券 */
+async function loadClaimable() {
+  try {
+    claimable.value = await fetchClaimableCoupons()
+  } catch {
+    claimable.value = []
+  }
+}
+
 async function load() {
   loading.value = true
+  errorKind.value = ''
   error.value = ''
   try {
     const [pointsResult, couponList, orderResult] = await Promise.all([
@@ -58,13 +89,50 @@ async function load() {
     coupons.value = couponList
     orders.value = orderResult.list
   } catch (err) {
-    error.value = err instanceof ApiError ? err.message : '加载失败，请稍后重试'
+    const failure = toAuthRefreshError(err)
+    errorKind.value = failure.kind === 'auth' ? 'auth' : failure.kind === 'network' ? 'network' : 'other'
+    error.value = failure.message
   } finally {
     loading.value = false
   }
 }
 
-onMounted(load)
+/** 领券：未登录先引导登录，已领取提示，成功后刷新我的优惠券 */
+async function onClaim(id: number) {
+  if (!state.profile) {
+    router.push({ name: 'member-login', query: { redirect: '/member' } })
+    return
+  }
+  if (isClaimed(id) || claiming.value === id) {
+    return
+  }
+  claiming.value = id
+  claimTip.value = ''
+  try {
+    await claimCoupon(id)
+    claimTip.value = '领取成功，已放入“我的优惠券”'
+    await Promise.all([load(), loadClaimable()])
+  } catch (err) {
+    if (err instanceof ApiError && err.message.includes('已领取')) {
+      claimTip.value = '该券已领取过，快去使用吧'
+      await Promise.all([load(), loadClaimable()])
+      return
+    }
+    errorKind.value = err instanceof ApiError && err.status === 0 ? 'network' : 'other'
+    error.value = err instanceof ApiError ? err.message : '领取失败，请稍后重试'
+  } finally {
+    claiming.value = null
+  }
+}
+
+const gotoLogin = () => {
+  router.push({ name: 'member-login', query: { redirect: '/member' } })
+}
+
+onMounted(() => {
+  void load()
+  void loadClaimable()
+})
 
 const onLogout = () => {
   logout()
@@ -127,10 +195,20 @@ const onLogout = () => {
           <button type="button" :class="{ 'is-active': activeTab === 'coupons' }" @click="activeTab = 'coupons'">
             我的优惠券
           </button>
+          <button type="button" :class="{ 'is-active': activeTab === 'claim' }" @click="activeTab = 'claim'">
+            领券中心
+          </button>
         </nav>
 
         <p v-if="loading" class="member__status">加载中…</p>
-        <p v-else-if="error" class="member__status member__status--error">{{ error }}</p>
+        <div v-else-if="errorKind" class="member__status member__status--error">
+          <p v-if="errorKind === 'auth'">{{ error }}</p>
+          <p v-else>{{ error || '网络异常，请检查服务是否启动' }}</p>
+          <button v-if="errorKind === 'auth'" type="button" class="btn btn-primary member__retry" @click="gotoLogin">
+            登录已过期，重新登录
+          </button>
+          <button v-else type="button" class="btn btn-outline member__retry" @click="load()">重试</button>
+        </div>
 
         <!-- 订单 -->
         <div v-else-if="activeTab === 'orders'" class="member__panel">
@@ -188,7 +266,7 @@ const onLogout = () => {
         </div>
 
         <!-- 优惠券 -->
-        <div v-else class="member__panel">
+        <div v-else-if="activeTab === 'coupons'" class="member__panel">
           <div class="coupon-filter">
             <button
               v-for="tab in COUPON_TABS"
@@ -227,6 +305,55 @@ const onLogout = () => {
               <span class="coupon-item__status">{{ coupon.statusText }}</span>
             </article>
           </div>
+        </div>
+
+        <!-- 领券中心 -->
+        <div v-else class="member__panel">
+          <p v-if="!state.profile" class="member__empty">
+            登录后即可领券，手机号一键登录。
+            <button type="button" class="member__inline-btn" @click="gotoLogin">去登录</button>
+          </p>
+          <template v-else>
+            <p v-if="claimTip" class="member__tip">{{ claimTip }}</p>
+            <p v-if="claimable.length === 0" class="member__empty">暂无可领取的优惠券，先去小程序点一杯吧。</p>
+            <div v-else class="claim-list">
+              <article v-for="template in claimable" :key="template.id" class="claim-item">
+                <div class="claim-item__value">
+                  <strong>{{
+                    template.type === 'discount'
+                      ? `${(template.discountPercent / 10).toFixed(1)} 折`
+                      : formatMoney(template.reduceFen)
+                  }}</strong>
+                  <span>满 {{ formatMoney(template.thresholdFen) }} 可用</span>
+                </div>
+                <div class="claim-item__body">
+                  <p class="claim-item__name">{{ template.name }}</p>
+                  <p class="claim-item__meta">
+                    {{ template.typeText }} · 领取后 {{ template.validDays }} 天内有效 · 剩余
+                    {{ template.remaining }} 张
+                  </p>
+                  <p class="claim-item__benefit">优惠：{{ couponBenefitText(template) }}</p>
+                </div>
+                <button
+                  type="button"
+                  class="btn btn-accent claim-item__btn"
+                  :disabled="isClaimed(template.id) || template.remaining <= 0 || claiming !== null"
+                  @click="onClaim(template.id)"
+                >
+                  {{
+                    isClaimed(template.id)
+                      ? '已领取'
+                      : template.remaining <= 0
+                        ? '已领完'
+                        : claiming === template.id
+                          ? '领取中'
+                          : '领取'
+                  }}
+                </button>
+              </article>
+            </div>
+            <p class="member__empty">领取成功的券会同步到“我的优惠券”，下单时自动推荐最优券。</p>
+          </template>
         </div>
       </section>
     </div>
@@ -599,6 +726,111 @@ const onLogout = () => {
 .coupon-item__status {
   font-size: var(--text-xs);
   color: var(--color-text-faint);
+}
+
+/* ---------- 加载失败 / 领券中心 ---------- */
+.member__retry {
+  margin-top: var(--space-3);
+}
+
+.member__inline-btn {
+  border: 0;
+  background: transparent;
+  color: var(--color-accent-strong);
+  font-size: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.member__tip {
+  border-radius: var(--radius-md);
+  padding: var(--space-3) var(--space-4);
+  background: rgb(125 155 106 / 12%);
+  font-size: var(--text-sm);
+  color: var(--matcha-600);
+}
+
+.claim-list {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.claim-item {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: var(--space-4);
+  padding: var(--space-4) var(--space-5);
+  border: 1px solid var(--caramel-300);
+  border-radius: var(--radius-lg);
+  background: linear-gradient(120deg, #fffdf9, #faf3e8);
+}
+
+.claim-item__value {
+  display: flex;
+  min-width: 96px;
+  flex-direction: column;
+  padding-right: var(--space-4);
+  border-right: 1px dashed var(--color-line-strong);
+}
+
+.claim-item__value strong {
+  font-family: var(--font-display);
+  font-size: var(--text-2xl);
+  color: var(--color-accent-strong);
+}
+
+.claim-item__value span {
+  font-size: var(--text-xs);
+  color: var(--color-text-faint);
+}
+
+.claim-item__name {
+  font-size: var(--text-base);
+  color: var(--color-primary-strong);
+}
+
+.claim-item__meta {
+  margin-top: 2px;
+  font-size: var(--text-xs);
+  color: var(--color-text-soft);
+}
+
+.claim-item__benefit {
+  margin-top: 2px;
+  font-size: var(--text-xs);
+  color: var(--color-text-faint);
+}
+
+.claim-item__btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+@media (max-width: 480px) {
+  .claim-item {
+    grid-template-columns: 1fr;
+    gap: var(--space-3);
+    padding: var(--space-4);
+  }
+
+  .claim-item__value {
+    flex-direction: row;
+    align-items: baseline;
+    gap: var(--space-2);
+    padding-right: 0;
+    padding-bottom: var(--space-2);
+    border-right: 0;
+    border-bottom: 1px dashed var(--color-line-strong);
+  }
+
+  .claim-item__value strong {
+    font-size: var(--text-xl);
+  }
+
+  .claim-item__btn {
+    justify-self: stretch;
+  }
 }
 
 @media (min-width: 1024px) {

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import ProductCard from '@/components/ProductCard.vue'
 import SectionTitle from '@/components/SectionTitle.vue'
 import ProductArt from '@/components/ProductArt.vue'
@@ -14,8 +14,40 @@ const activeId = ref<number | 'all'>('all')
 const loading = ref(true)
 const error = ref('')
 
-const visibleProducts = computed(() =>
-  activeId.value === 'all' ? products.value : products.value.filter((item) => item.categoryId === activeId.value),
+/** 一个分类分组：同分类的卡片连续渲染，组间有 SectionTitle */
+interface MenuGroup {
+  /** 锚点 id */
+  key: string
+  name: string
+  desc: string
+  categoryId: number | null
+  items: Product[]
+}
+
+/** 按分类分组（分类顺序取后台 sort），同分类商品连续出现、不再交错 */
+const groups = computed<MenuGroup[]>(() => {
+  const knownIds = new Set(categories.value.map((category) => category.id))
+  const list: MenuGroup[] = categories.value
+    .map((category) => ({
+      key: `category-${category.id}`,
+      name: category.name,
+      desc: `${category.productCount} 款在售商品`,
+      categoryId: category.id,
+      items: products.value.filter((item) => item.categoryId === category.id),
+    }))
+    .filter((group) => group.items.length > 0)
+  // 兜底：后台未返回分类的商品按分类名归组，避免漏渲染
+  const orphans = products.value.filter((item) => !knownIds.has(item.categoryId))
+  for (const name of [...new Set(orphans.map((item) => item.categoryName || '其他'))]) {
+    const items = orphans.filter((item) => (item.categoryName || '其他') === name)
+    list.push({ key: `category-other-${items[0]?.categoryId ?? 0}`, name, desc: `${items.length} 款在售商品`, categoryId: null, items })
+  }
+  return list
+})
+
+/** 当前展示的分组：全部 = 全部分组；选中分类 = 仅该分类 */
+const visibleGroups = computed(() =>
+  activeId.value === 'all' ? groups.value : groups.value.filter((group) => group.categoryId === activeId.value),
 )
 
 const tabs = computed(() => [
@@ -27,14 +59,60 @@ const tabs = computed(() => [
   })),
 ])
 
-const activeCategory = computed(() =>
-  categories.value.find((category) => category.id === activeId.value),
-)
-
 const isPromoProduct = (productId: number) => promo.value?.productIds.includes(productId) ?? false
 const promoCount = computed(() => promo.value?.productIds.length ?? 0)
 
+/** 分类 tab：选中后右侧滚动到对应分类锚点 */
+function selectTab(id: number | 'all') {
+  activeId.value = id
+  if (id === 'all') {
+    scrollToKey('menu-sections')
+    return
+  }
+  scrollToKey(`category-${id}`)
+}
+
+/** 滚动到锚点（sticky 头部已用 scroll-margin-top 预留高度） */
+function scrollToKey(key: string) {
+  const target = document.getElementById(key)
+  if (target && typeof target.scrollIntoView === 'function') {
+    target.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }
+}
+
+/** 滚动高亮：以 sticky 导航下沿为基准，取最后一个跨过分界线的分类 */
+const STICKY_OFFSET = 96
+
+function syncActiveFromScroll() {
+  if (activeId.value !== 'all' || groups.value.length === 0) {
+    return
+  }
+  let current: number | null = null
+  for (const group of groups.value) {
+    if (group.categoryId === null) {
+      continue
+    }
+    const element = document.getElementById(group.key)
+    if (!element) {
+      continue
+    }
+    if (element.getBoundingClientRect().top <= STICKY_OFFSET) {
+      current = group.categoryId
+    }
+  }
+  const next: number | 'all' = current ?? 'all'
+  if (next !== activeId.value) {
+    activeId.value = next
+  }
+}
+
+function onScroll() {
+  syncActiveFromScroll()
+}
+
 onMounted(async () => {
+  window.addEventListener('scroll', onScroll, { passive: true })
+  window.addEventListener('resize', onScroll)
   try {
     const [categoryList, productResult, promoState] = await Promise.all([
       fetchCategories(),
@@ -48,7 +126,13 @@ onMounted(async () => {
     error.value = err instanceof ApiError ? err.message : '菜单加载失败，请稍后重试'
   } finally {
     loading.value = false
+    syncActiveFromScroll()
   }
+})
+
+onBeforeUnmount(() => {
+  window.removeEventListener('scroll', onScroll)
+  window.removeEventListener('resize', onScroll)
 })
 </script>
 
@@ -87,7 +171,7 @@ onMounted(async () => {
           type="button"
           class="menu-tabs__item"
           :class="{ 'is-active': activeId === tab.id }"
-          @click="activeId = tab.id"
+          @click="selectTab(tab.id)"
         >
           {{ tab.name }}
           <span class="menu-tabs__count">{{ tab.count }}</span>
@@ -98,22 +182,31 @@ onMounted(async () => {
       <p v-else-if="error" class="menu-status menu-status--error">{{ error }}</p>
       <template v-else>
         <SectionTitle
-          v-if="activeCategory"
-          :eyebrow="activeCategory.name"
-          :title="activeCategory.name"
-          :desc="`${activeCategory.productCount} 款在售商品`"
+          v-if="activeId === 'all'"
+          eyebrow="ALL"
+          title="全部在售"
+          desc="按分类排序，金额显示为 ¥xx.xx"
         />
-        <SectionTitle v-else eyebrow="ALL" title="全部在售" desc="按分类排序，金额显示为 ¥xx.xx" />
 
-        <div class="menu-grid">
-          <ProductCard
-            v-for="product in visibleProducts"
-            :key="product.id"
-            :product="product"
-            :promo="isPromoProduct(product.id)"
-          />
+        <div id="menu-sections" class="menu-sections">
+          <section
+            v-for="group in visibleGroups"
+            :id="group.key"
+            :key="group.key"
+            class="menu-section"
+          >
+            <SectionTitle :eyebrow="group.name" :title="group.name" :desc="group.desc" />
+            <div class="menu-grid">
+              <ProductCard
+                v-for="product in group.items"
+                :key="product.id"
+                :product="product"
+                :promo="isPromoProduct(product.id)"
+              />
+            </div>
+          </section>
         </div>
-        <p v-if="visibleProducts.length === 0" class="menu-status">该分类暂无在售商品</p>
+        <p v-if="visibleGroups.length === 0" class="menu-status">该分类暂无在售商品</p>
       </template>
     </div>
 
@@ -237,6 +330,16 @@ onMounted(async () => {
   opacity: 0.7;
 }
 
+.menu-sections {
+  display: grid;
+  gap: var(--space-6);
+}
+
+/* 锚点预留 sticky 分类栏高度 */
+.menu-section {
+  scroll-margin-top: calc(var(--header-height) + 56px);
+}
+
 .menu-grid {
   display: grid;
   grid-template-columns: 1fr;
@@ -312,6 +415,41 @@ onMounted(async () => {
 
   .menu-hero__art {
     display: block;
+  }
+}
+
+/* 小屏（390 宽）：收紧留白与字号，保证无横向滚动 */
+@media (max-width: 480px) {
+  .menu-hero__inner {
+    padding-block: var(--space-5);
+  }
+
+  .menu-hero__title {
+    font-size: var(--text-2xl);
+  }
+
+  .menu-body {
+    padding-block: var(--space-4);
+  }
+
+  .menu-sections {
+    gap: var(--space-5);
+  }
+
+  .menu-grid {
+    gap: var(--space-3);
+  }
+
+  .menu-tabs {
+    margin-bottom: var(--space-4);
+  }
+
+  .menu-note {
+    padding-block: var(--space-5);
+  }
+
+  .menu-note__grid > div {
+    padding: var(--space-3);
   }
 }
 </style>

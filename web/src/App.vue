@@ -4,7 +4,9 @@ import AppFooter from '@/components/AppFooter.vue'
 import { useAuth } from '@/composables/useAuth'
 
 const { refresh } = useAuth()
-void refresh()
+void refresh().catch(() => {
+  // 启动时刷新失败：网络异常保留登录态（页面自行提示重试）；认证失败已由 401 集中处理跳登录
+})
 </script>
 
 <template>

@@ -10,8 +10,10 @@ const WIDTHS = [390, 768, 1440]
 const PAGES = [
   { path: '/', name: '首页' },
   { path: '/menu', name: '菜单' },
+  { path: '/product/1', name: '商品详情' },
   { path: '/stores', name: '门店' },
   { path: '/story', name: '品牌故事' },
+  { path: '/member', name: '会员中心' },
   { path: '/member/login', name: '会员登录' },
 ]
 

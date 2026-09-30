@@ -73,7 +73,10 @@ vi.mock('@/api/promo', () => ({
 function mountPage() {
   const router = createRouter({
     history: createWebHistory(),
-    routes: [{ path: '/', component: { template: '<div />' } }],
+    routes: [
+      { path: '/', component: { template: '<div />' } },
+      { path: '/product/:id', name: 'product', component: { template: '<div />' } },
+    ],
   })
   return mount(MenuPage, { global: { plugins: [router] } })
 }
@@ -128,6 +131,34 @@ describe('MenuPage', () => {
     // 分类计数
     expect(tabs[0]!.text()).toContain('3')
     expect(tabs[1]!.text()).toContain('2')
+  })
+
+  test('按分类分组渲染：同类卡片连续、组间有分类标题', async () => {
+    const wrapper = mountPage()
+    await flushPromises()
+    const sections = wrapper.findAll('.menu-section')
+    expect(sections).toHaveLength(2)
+    // 分组顺序：咖啡 → 茶饮，卡片不再交错
+    expect(sections[0]!.findAll('.product-card__name').map((node) => node.text())).toEqual([
+      '山野拿铁',
+      '琥珀美式',
+    ])
+    expect(sections[1]!.findAll('.product-card__name').map((node) => node.text())).toEqual([
+      '白桃乌龙气泡',
+    ])
+    // 每组都有 SectionTitle 标题
+    expect(sections[0]!.text()).toContain('咖啡')
+    expect(sections[1]!.text()).toContain('茶饮')
+    // 锚点 id 供分类 tab 滚动定位
+    expect(sections[0]!.attributes('id')).toBe('category-1')
+    expect(sections[1]!.attributes('id')).toBe('category-2')
+  })
+
+  test('商品卡片可跳转详情页', async () => {
+    const wrapper = mountPage()
+    await flushPromises()
+    const link = wrapper.findAll('.product-card__link')[0]!
+    expect(link.attributes('href')).toBe('/product/1')
   })
 
   test('接口错误时展示中文错误', async () => {

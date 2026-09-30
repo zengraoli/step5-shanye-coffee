@@ -5,19 +5,14 @@ import ProductCard from '@/components/ProductCard.vue'
 import StoreCard from '@/components/StoreCard.vue'
 import SectionTitle from '@/components/SectionTitle.vue'
 import { fetchProducts, fetchStores, type Product, type Store } from '@/api/catalog'
+import { pickFeatured } from '@/utils/featured'
 
 const featured = ref<Product[]>([])
 const stores = ref<Store[]>([])
 const loading = ref(true)
 
-/** 当季推荐：优先取带“招牌 / 限定 / 人气”标签的商品，补齐到 6 个 */
-function pickFeatured(list: Product[]): Product[] {
-  const preferred = list.filter((item) =>
-    ['招牌', '限定', '人气', '新品'].some((tag) => item.subtitle.includes(tag)),
-  )
-  const rest = list.filter((item) => !preferred.includes(item))
-  return [...preferred, ...rest].slice(0, 6)
-}
+/** 当季推荐：优先取带推荐标签的有货商品，不足 6 个用其余有货商品补齐 */
+const featuredPicks = (list: Product[]): Product[] => pickFeatured(list)
 
 onMounted(async () => {
   try {
@@ -25,7 +20,7 @@ onMounted(async () => {
       fetchProducts({ pageSize: 60 }),
       fetchStores(),
     ])
-    featured.value = pickFeatured(productResult.list)
+    featured.value = featuredPicks(productResult.list)
     stores.value = storeList
   } catch {
     featured.value = []
