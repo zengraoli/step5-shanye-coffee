@@ -10,6 +10,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.runBlocking
+import com.shanye.coffee.data.remote.dto.MemberProfileDto
 
 private val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "shanye_session")
 
@@ -37,6 +38,15 @@ class SessionStore(private val context: Context) {
         context.dataStore.edit { preferences ->
             preferences[profileKey] = profileJson
         }
+    }
+
+    /** 读取本地登录态对应的会员资料；没有或解析失败返回 null */
+    suspend fun restore(): MemberProfileDto? {
+        val json = profileJsonFlow.first() ?: return null
+        return runCatching {
+            kotlinx.serialization.json.Json { ignoreUnknownKeys = true }
+                .decodeFromString<MemberProfileDto>(json)
+        }.getOrNull()
     }
 
     suspend fun clear() {

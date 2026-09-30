@@ -1,6 +1,7 @@
 package com.shanye.coffee.ui.navigation
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -29,6 +30,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavHostController
@@ -38,7 +40,7 @@ import com.shanye.coffee.ui.theme.BrandGreenContainer
 import com.shanye.coffee.ui.theme.CreamBackground
 import com.shanye.coffee.ui.theme.TextSecondary
 
-/** 底部导航（与设计稿一致：选中态为浅绿胶囊） */
+/** 底部导航（与设计稿一致：选中态为浅绿胶囊，四个 Tab 可点击切换） */
 @Composable
 fun ShanyeBottomBar(navController: NavHostController) {
     val backStackEntry by navController.currentBackStackEntryAsState()
@@ -60,6 +62,19 @@ fun ShanyeBottomBar(navController: NavHostController) {
                 modifier = Modifier
                     .clip(RoundedCornerShape(20.dp))
                     .background(if (selected) BrandGreenContainer else CreamBackground)
+                    .clickable(
+                        role = Role.Tab,
+                        onClick = {
+                            if (!selected) {
+                                navController.navigate(tab.route) {
+                                    // 四个 Tab 之间切换：保留各 Tab 状态，不堆栈
+                                    popUpTo(Routes.HOME) { saveState = true }
+                                    launchSingleTop = true
+                                    restoreState = true
+                                }
+                            }
+                        },
+                    )
                     .padding(horizontal = 18.dp, vertical = 6.dp),
             ) {
                 Icon(
@@ -85,7 +100,7 @@ private fun TopLevelTab.icon(selected: Boolean): ImageVector = when (this) {
     TopLevelTab.PROFILE -> if (selected) Icons.Filled.Person else Icons.Outlined.Person
 }
 
-/** 顶部导航条占位（内容区留白） */
+/** 底部导航条占位（内容区留白） */
 @Composable
 fun BottomBarSpacer() {
     Box(

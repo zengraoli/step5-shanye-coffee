@@ -4,6 +4,7 @@ import com.shanye.coffee.data.local.SessionStore
 import com.shanye.coffee.data.remote.ApiResult
 import com.shanye.coffee.data.remote.ApiService
 import com.shanye.coffee.data.remote.dto.CategoryDto
+import com.shanye.coffee.data.remote.dto.CouponTemplateDto
 import com.shanye.coffee.data.remote.dto.ProductListDto
 import com.shanye.coffee.data.remote.dto.PromoStateDto
 import com.shanye.coffee.data.remote.dto.StoreDto
@@ -24,7 +25,11 @@ class CatalogRepository(
         keyword: String? = null,
         page: Int = 1,
         pageSize: Int = 60,
-    ): ApiResult<ProductListDto> = call { api.products(categoryId, keyword, page, pageSize).toApiResult() }
+        storeId: Long? = null,
+    ): ApiResult<ProductListDto> = call { api.products(categoryId, keyword, storeId, page, pageSize).toApiResult() }
+
+    /** 可领取的券模板 */
+    suspend fun couponTemplates(): ApiResult<List<CouponTemplateDto>> = call { api.couponTemplates().toApiResult() }
 
     suspend fun promo(): ApiResult<PromoStateDto> = call { api.promo().toApiResult() }
 }

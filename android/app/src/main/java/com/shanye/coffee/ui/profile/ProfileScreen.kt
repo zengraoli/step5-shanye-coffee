@@ -16,15 +16,25 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.TextButton
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.automirrored.filled.Logout
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -53,6 +63,9 @@ fun ProfileScreen(
     onGoOrders: () -> Unit,
     onGoCoupons: () -> Unit,
     onGoLogin: () -> Unit = {},
+    onLogout: () -> Unit = {},
+    onOpenBenefits: () -> Unit = {},
+    onOpenSettings: () -> Unit = {},
 ) {
     val container = LocalAppContainer.current
     val viewModel: ProfileViewModel = viewModel(
@@ -64,16 +77,76 @@ fun ProfileScreen(
         },
     )
     val state by viewModel.state.collectAsStateWithLifecycle()
+    var showBenefits by rememberSaveable { mutableStateOf(false) }
+    var showSettings by rememberSaveable { mutableStateOf(false) }
+
+    // 会员权益
+    if (showBenefits) {
+        val profile = state.profile
+        AlertDialog(
+            onDismissRequest = { showBenefits = false },
+            title = { Text(text = "会员权益") },
+            text = {
+                Column {
+                    Text(text = "当前等级：${profile?.levelText ?: "-"}")
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Text(text = "· 消费 1 元积 1 分，积分可抵换购与升级")
+                    Text(text = "· 银卡 0 分 / 金卡 500 分 / 黑卡 2000 分")
+                    Text(text = "· 会员专享券在“领券中心”领取，可与第二杯半价同享")
+                    if (profile?.nextLevelText != null) {
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Text(
+                            text = "再积 ${profile.pointsToNextLevel} 分升级为${profile.nextLevelText}",
+                            style = MaterialTheme.typography.bodySmall,
+                        )
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showBenefits = false }) { Text(text = "知道了") }
+            },
+        )
+    }
+
+    // 设置
+    if (showSettings) {
+        val apiBase = remember {
+            runCatching {
+                com.shanye.coffee.BuildConfig.API_BASE_URL
+            }.getOrDefault("http://127.0.0.1:3000")
+        }
+        AlertDialog(
+            onDismissRequest = { showSettings = false },
+            title = { Text(text = "设置") },
+            text = {
+                Column {
+                    Text(text = "接口地址：$apiBase")
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Text(
+                        text = "如需切换后端，请重新构建并指定 API_BASE_URL。",
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showSettings = false }) { Text(text = "关闭") }
+            },
+        )
+    }
 
     ProfileScreenContent(
         state = state,
         onGoOrders = onGoOrders,
         onGoCoupons = onGoCoupons,
-        onRefresh = viewModel::load,
+        onRefresh = viewModel::refresh,
         onGoLogin = onGoLogin,
+        onOpenBenefits = { showBenefits = true },
+        onOpenSettings = { showSettings = true },
+        onLogout = { viewModel.logout(); onLogout() },
     )
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun ProfileScreenContent(
     state: ProfileUiState,
@@ -81,6 +154,9 @@ internal fun ProfileScreenContent(
     onGoCoupons: () -> Unit,
     onRefresh: () -> Unit,
     onGoLogin: () -> Unit,
+    onOpenBenefits: () -> Unit = {},
+    onOpenSettings: () -> Unit = {},
+    onLogout: () -> Unit = {},
 ) {
     if (state.loading) {
         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -88,7 +164,7 @@ internal fun ProfileScreenContent(
         }
         return
     }
-    if (!state.loggedIn || state.profile == null) {
+    if (!state.loggedIn) {
         Box(
             modifier = Modifier
                 .fillMaxSize()
@@ -119,6 +195,34 @@ internal fun ProfileScreenContent(
         }
         return
     }
+    // 已登录但资料还没到：区分“加载失败（可重试）”与“加载中”
+    if (state.profile == null) {
+        Box(
+            modifier = Modifier.fillMaxSize().padding(32.dp),
+            contentAlignment = Alignment.Center,
+        ) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Text(
+                    text = state.error ?: "正在加载会员信息…",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = TextSecondary,
+                )
+                if (state.error != null) {
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(percent = 50))
+                            .background(BrandGreen)
+                            .clickable(onClick = onRefresh)
+                            .padding(horizontal = 28.dp, vertical = 10.dp),
+                    ) {
+                        Text(text = "重试", style = MaterialTheme.typography.titleSmall, color = TextOnDark)
+                    }
+                }
+            }
+        }
+        return
+    }
 
     val profile = state.profile
     val progress = if (profile.nextLevel == null) {
@@ -128,6 +232,11 @@ internal fun ProfileScreenContent(
         if (total <= 0) 0f else profile.points.toFloat() / total.toFloat()
     }
 
+    PullToRefreshBox(
+        isRefreshing = state.refreshing,
+        onRefresh = onRefresh,
+        modifier = Modifier.fillMaxSize(),
+    ) {
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -247,8 +356,9 @@ internal fun ProfileScreenContent(
         ) {
             MenuRow(icon = "order", title = "我的订单", onClick = onGoOrders)
             MenuRow(icon = "coupon", title = "我的优惠券", onClick = onGoCoupons)
-            MenuRow(icon = "star", title = "会员权益", onClick = {})
-            MenuRow(icon = "setting", title = "设置", onClick = {})
+            MenuRow(icon = "star", title = "会员权益", onClick = onOpenBenefits)
+            MenuRow(icon = "setting", title = "设置", onClick = onOpenSettings)
+            MenuRow(icon = "logout", title = "退出登录", onClick = onLogout)
         }
 
         Spacer(modifier = Modifier.height(12.dp))
@@ -263,6 +373,7 @@ internal fun ProfileScreenContent(
         }
 
         Spacer(modifier = Modifier.height(32.dp))
+    }
     }
 }
 
@@ -299,6 +410,12 @@ private fun MenuRow(icon: String, title: String, onClick: () -> Unit) {
             when (icon) {
                 "order" -> Text(text = "单", style = MaterialTheme.typography.labelMedium, color = BrandGreen)
                 "coupon" -> Text(text = "券", style = MaterialTheme.typography.labelMedium, color = BrandGreen)
+                "logout" -> Icon(
+                    imageVector = Icons.AutoMirrored.Filled.Logout,
+                    contentDescription = null,
+                    tint = BrandGreen,
+                    modifier = Modifier.size(18.dp),
+                )
                 "star" -> Icon(
                     imageVector = Icons.Filled.Star,
                     contentDescription = null,

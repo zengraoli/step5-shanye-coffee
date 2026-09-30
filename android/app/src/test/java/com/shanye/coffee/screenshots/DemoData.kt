@@ -60,12 +60,12 @@ val demoCategories = listOf(
 )
 
 val demoProducts = listOf(
-    ProductDto(1, 1, "咖啡", "桂花拿铁", "第二杯半价", "桂花乌龙浓缩与鲜奶，秋日限定", "", 2800, true, false, 1, specGroups),
-    ProductDto(2, 1, "咖啡", "焦糖栗子拿铁", "新品", "秋栗泥 · 焦糖 · 鲜牛奶", "", 3000, true, false, 2, specGroups),
-    ProductDto(3, 1, "咖啡", "山野生椰", "", "海南生椰乳 · 云南小粒", "", 2600, true, false, 3, specGroups),
-    ProductDto(4, 1, "咖啡", "冷萃 · 高山日晒", "售罄", "云南保山 · 12 小时冷萃", "", 2400, true, true, 4, specGroups),
-    ProductDto(7, 2, "茶饮", "白桃乌龙气泡", "新品", "白桃果肉 · 乌龙茶汤", "", 2600, true, false, 1, specGroups),
-    ProductDto(13, 3, "轻食", "火腿芝士可颂", "", "现烤 · 3 层 32 折", "", 2200, true, false, 1, specGroups),
+    ProductDto(1, 1, "咖啡", "桂花拿铁", "第二杯半价", "桂花乌龙浓缩与鲜奶，秋日限定", "", 2800, true, false, emptyList(), 1, specGroups),
+    ProductDto(2, 1, "咖啡", "焦糖栗子拿铁", "新品", "秋栗泥 · 焦糖 · 鲜牛奶", "", 3000, true, false, emptyList(), 2, specGroups),
+    ProductDto(3, 1, "咖啡", "山野生椰", "", "海南生椰乳 · 云南小粒", "", 2600, true, false, emptyList(), 3, specGroups),
+    ProductDto(4, 1, "咖啡", "冷萃 · 高山日晒", "售罄", "云南保山 · 12 小时冷萃", "", 2400, true, true, emptyList(), 4, specGroups),
+    ProductDto(7, 2, "茶饮", "白桃乌龙气泡", "新品", "白桃果肉 · 乌龙茶汤", "", 2600, true, false, emptyList(), 1, specGroups),
+    ProductDto(13, 3, "轻食", "火腿芝士可颂", "", "现烤 · 3 层 32 折", "", 2200, true, false, emptyList(), 1, specGroups),
 )
 
 val demoPromo = PromoActivityDto(
@@ -128,8 +128,8 @@ fun demoCheckoutState() = CheckoutUiState(
         storeName = "山野咖啡 · 西溪印象城店",
         orderType = "takeout",
         items = listOf(
-            OrderItemDto(1, "桂花拿铁", "大杯 · 冰 · 少糖", 3100, 2, 6200),
-            OrderItemDto(13, "火腿芝士可颂", "现烤", 2200, 1, 2200),
+            OrderItemDto(1, "桂花拿铁", "大杯 · 冰 · 少糖", "咖啡", 3100, 2, 6200),
+            OrderItemDto(13, "火腿芝士可颂", "现烤", "轻食", 2200, 1, 2200),
         ),
         totalFen = 8400,
         promoDiscountFen = 1450,
@@ -157,7 +157,7 @@ fun demoOrderDetailState() = OrderDetailUiState(
         status = "making",
         statusText = "制作中",
         items = listOf(
-            OrderItemDto(1, "桂花拿铁", "大杯 · 冰 · 少糖", 3100, 2, 6200),
+            OrderItemDto(1, "桂花拿铁", "大杯 · 冰 · 少糖", "咖啡", 3100, 2, 6200),
         ),
         totalFen = 6200,
         discountFen = 1000,
@@ -183,7 +183,7 @@ fun demoOrdersState() = com.shanye.coffee.ui.orders.OrdersUiState(
             orderTypeText = "自提",
             status = "making",
             statusText = "制作中",
-            items = listOf(OrderItemDto(1, "桂花拿铁", "大杯 · 冰 · 少糖", 3100, 2, 6200)),
+            items = listOf(OrderItemDto(1, "桂花拿铁", "大杯 · 冰 · 少糖", "咖啡", 3100, 2, 6200)),
             totalFen = 6200,
             discountFen = 1000,
             promoDiscountFen = 1450,
@@ -200,7 +200,7 @@ fun demoOrdersState() = com.shanye.coffee.ui.orders.OrdersUiState(
             orderTypeText = "堂食",
             status = "completed",
             statusText = "已完成",
-            items = listOf(OrderItemDto(3, "山野生椰", "中杯 · 冰 · 少糖", 2600, 1, 2600)),
+            items = listOf(OrderItemDto(3, "山野生椰", "中杯 · 冰 · 少糖", "咖啡", 2600, 1, 2600)),
             totalFen = 2600,
             discountFen = 0,
             promoDiscountFen = 0,

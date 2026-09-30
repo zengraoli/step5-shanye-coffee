@@ -6,25 +6,28 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import kotlinx.coroutines.flow.first
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.navigation.NavHostController
+import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import androidx.navigation.navDeepLink
+import com.shanye.coffee.DeepLinkBus
 import com.shanye.coffee.data.MemberSession
 import com.shanye.coffee.data.OrderSession
-import com.shanye.coffee.data.remote.dto.MemberProfileDto
+import com.shanye.coffee.data.SessionBus
 import com.shanye.coffee.ui.LocalAppContainer
 import com.shanye.coffee.ui.checkout.CheckoutScreen
+import com.shanye.coffee.ui.coupons.CouponsScreen
+import com.shanye.coffee.ui.coupons.CouponsScreen
 import com.shanye.coffee.ui.home.HomeScreen
 import com.shanye.coffee.ui.login.LoginScreen
 import com.shanye.coffee.ui.order.OrderScreen
 import com.shanye.coffee.ui.orderdetail.OrderDetailScreen
-import com.shanye.coffee.ui.order.OrderScreen
 import com.shanye.coffee.ui.orders.OrdersScreen
 import com.shanye.coffee.ui.profile.ProfileScreen
 
@@ -34,18 +37,48 @@ fun ShanyeApp() {
     val navController = rememberNavController()
     val container = LocalAppContainer.current
 
-    // 启动时恢复本地保存的登录态
-    LaunchedEffect(Unit) {
-        container.sessionStore.profileJsonFlow.first()?.let { json ->
+    // 导航辅助绑定到带 graph 的控制器（401 深链都走它，不会崩）
+    LaunchedEffect(navController) {
+        ShanyeNavigator.bind(navController)
+    }
+
+    // 深链（冷启动 + onNewIntent）统一在这里消费
+    LaunchedEffect(navController) {
+        DeepLinkBus.uris.collect { uri ->
+            val route = DeepLinkBus.routeFor(uri) ?: return@collect
             runCatching {
-                kotlinx.serialization.json.Json { ignoreUnknownKeys = true }
-                    .decodeFromString<com.shanye.coffee.data.remote.dto.MemberProfileDto>(json)
-            }.onSuccess { com.shanye.coffee.data.MemberSession.update(it) }
+                navController.navigate(route) { launchSingleTop = true }
+            }
         }
     }
 
+    // 启动时恢复本地保存的登录态（冷启动 deep link 依赖这里的时序）
+    LaunchedEffect(Unit) {
+        container.sessionStore.restore()?.let { profile ->
+            MemberSession.update(profile)
+        }
+        MemberSession.markRestored()
+    }
+
+    // 登录态失效：统一跳登录页（此时 graph 一定已建好）
+    LaunchedEffect(Unit) {
+        SessionBus.unauthorized.collect {
+            runCatching {
+                navController.navigate(Routes.LOGIN) {
+                    popUpTo(Routes.HOME) { inclusive = false }
+                    launchSingleTop = true
+                }
+            }
+        }
+    }
+
+    // 底部导航只在四个 Tab 页面显示；登录 / 结算 / 详情等页面隐藏
+    val backStackEntry by navController.currentBackStackEntryAsState()
+    val route = backStackEntry?.destination?.route
+    val showBottomBar = TopLevelTab.entries.any { it.route == route }
+
     Scaffold(
-        bottomBar = { ShanyeBottomBar(navController) },
+        bottomBar = { if (showBottomBar) ShanyeBottomBar(navController) },
         containerColor = androidx.compose.material3.MaterialTheme.colorScheme.background,
     ) { innerPadding ->
         Box(
@@ -63,19 +96,29 @@ fun ShanyeApp() {
                             OrderSession.setOrderType(type)
                             navController.navigate(Routes.ORDER) { launchSingleTop = true }
                         },
-                        onProductClick = {
-                            navController.navigate(Routes.ORDER) { launchSingleTop = true }
+                        onProductClick = { productId ->
+                            navController.navigate("${Routes.ORDER}?productId=$productId") {
+                                launchSingleTop = true
+                            }
                         },
                     )
                 }
 
                 composable(
-                    route = Routes.ORDER,
-                    deepLinks = listOf(navDeepLink { uriPattern = "shanye://order" }),
-                ) {
+                    route = "${Routes.ORDER}?productId={productId}",
+                    arguments = listOf(
+                        androidx.navigation.navArgument("productId") {
+                            type = NavType.LongType
+                            defaultValue = 0L
+                        },
+                    ),
+                    deepLinks = listOf(navDeepLink { uriPattern = "shanye://order?productId={productId}" }),
+                ) { entry ->
+                    val focusProductId = entry.arguments?.getLong("productId") ?: 0L
                     OrderScreen(
+                        focusProductId = focusProductId,
                         onGoCheckout = {
-                            navController.navigate(Routes.CHECKOUT)
+                            navController.navigate(Routes.CHECKOUT) { launchSingleTop = true }
                         },
                     )
                 }
@@ -89,7 +132,7 @@ fun ShanyeApp() {
                             navController.navigate(Routes.orderDetail(orderId))
                         },
                         onGoLogin = {
-                            navController.navigate(Routes.LOGIN)
+                            navController.navigate(Routes.LOGIN) { launchSingleTop = true }
                         },
                     )
                 }
@@ -99,9 +142,32 @@ fun ShanyeApp() {
                     deepLinks = listOf(navDeepLink { uriPattern = "shanye://profile" }),
                 ) {
                     ProfileScreen(
-                        onGoOrders = { navController.navigate(Routes.ORDERS) },
-                        onGoCoupons = { navController.navigate(Routes.ORDERS) },
-                        onGoLogin = { navController.navigate(Routes.LOGIN) },
+                        onGoOrders = {
+                            navController.navigate(Routes.ORDERS) { launchSingleTop = true }
+                        },
+                        onGoCoupons = {
+                            navController.navigate(Routes.COUPONS) { launchSingleTop = true }
+                        },
+                        onGoLogin = {
+                            navController.navigate(Routes.LOGIN) { launchSingleTop = true }
+                        },
+                        onLogout = {
+                            navController.navigate(Routes.HOME) {
+                                popUpTo(Routes.HOME) { inclusive = true }
+                                launchSingleTop = true
+                            }
+                        },
+                    )
+                }
+
+                composable(
+                    route = Routes.COUPONS,
+                    deepLinks = listOf(navDeepLink { uriPattern = "shanye://coupons" }),
+                ) {
+                    CouponsScreen(
+                        onGoLogin = {
+                            navController.navigate(Routes.LOGIN) { launchSingleTop = true }
+                        },
                     )
                 }
 
@@ -111,10 +177,9 @@ fun ShanyeApp() {
                 ) {
                     LoginScreen(
                         onLoggedIn = {
-                            // 登录后回到原页面：有返回栈则返回，否则回首页
-                            if (navController.previousBackStackEntry != null) {
-                                navController.popBackStack()
-                            } else {
+                            // 登录后回到原页面：有返回栈则返回，否则回首页 Tab
+                            val returned = navController.popBackStack()
+                            if (!returned) {
                                 navController.navigate(Routes.HOME) {
                                     popUpTo(Routes.HOME) { inclusive = true }
                                     launchSingleTop = true
@@ -130,19 +195,25 @@ fun ShanyeApp() {
                 ) {
                     CheckoutScreen(
                         onPaid = { orderId ->
-                            navController.navigate(Routes.orderDetail(orderId))
+                            // 支付后进入详情，并把已支付的结算页从返回栈移除
+                            navController.navigate(Routes.orderDetail(orderId)) {
+                                popUpTo(Routes.CHECKOUT) { inclusive = true }
+                                launchSingleTop = true
+                            }
                         },
                         onBack = { navController.popBackStack() },
-                        onGoLogin = { navController.navigate(Routes.LOGIN) },
+                        onGoLogin = {
+                            navController.navigate(Routes.LOGIN) { launchSingleTop = true }
+                        },
                     )
                 }
 
                 composable(
-                    route = "${Routes.ORDER_DETAIL}?${Routes.ARG_ORDER_ID}={${Routes.ARG_ORDER_ID}}",
+                    route = Routes.ORDER_DETAIL_PATTERN,
                     arguments = listOf(
                         navArgument(Routes.ARG_ORDER_ID) { type = NavType.LongType },
                     ),
-                    deepLinks = listOf(navDeepLink { uriPattern = "shanye://order-detail/{orderId}" }),
+                    deepLinks = listOf(navDeepLink { uriPattern = "shanye://order-detail/{${Routes.ARG_ORDER_ID}}" }),
                 ) { entry ->
                     val orderId = entry.arguments?.getLong(Routes.ARG_ORDER_ID) ?: 0L
                     OrderDetailScreen(
@@ -155,31 +226,5 @@ fun ShanyeApp() {
     }
 }
 
-/** 导航辅助（供各页面跳转使用） */
-object ShanyeNavigator {
-    lateinit var controller: NavHostController
-
-    fun bind(controller: NavHostController) {
-        this.controller = controller
-    }
-
-    fun goLogin() {
-        controller.navigate(Routes.LOGIN)
-    }
-
-    fun goCheckout() {
-        controller.navigate(Routes.CHECKOUT)
-    }
-
-    fun goOrders() {
-        controller.navigate(Routes.ORDERS)
-    }
-
-    fun goOrderDetail(orderId: Long) {
-        controller.navigate(Routes.orderDetail(orderId))
-    }
-
-    fun back() {
-        controller.popBackStack()
-    }
-}
+/** 兼容旧代码：导航辅助 */
+object ShanyeNavigatorHolder

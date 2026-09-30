@@ -15,7 +15,11 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
@@ -71,6 +75,18 @@ fun OrdersScreen(onOrderClick: (Long) -> Unit, onGoLogin: () -> Unit = {}) {
     )
     val state by viewModel.state.collectAsStateWithLifecycle()
 
+    // 回到订单页时自动刷新：支付 / 取餐后列表立刻是最新状态
+    val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
+    androidx.compose.runtime.DisposableEffect(lifecycleOwner) {
+        val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
+            if (event == androidx.lifecycle.Lifecycle.Event.ON_START && viewModel.state.value.loggedIn) {
+                viewModel.refresh()
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
+
     OrdersScreenContent(
         state = state,
         onSelectStatus = viewModel::selectStatus,
@@ -80,7 +96,7 @@ fun OrdersScreen(onOrderClick: (Long) -> Unit, onGoLogin: () -> Unit = {}) {
     )
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 internal fun OrdersScreenContent(
     state: OrdersUiState,
@@ -101,12 +117,13 @@ internal fun OrdersScreenContent(
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
         )
 
-        // 状态筛选
-        Row(
+        // 状态筛选（FlowRow 换行，窄屏也不会挤出屏幕）
+        FlowRow(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 16.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             STATUS_FILTERS.forEach { (value, label) ->
                 val active = state.status == value
@@ -129,11 +146,42 @@ internal fun OrdersScreenContent(
         Spacer(modifier = Modifier.height(12.dp))
 
         when {
+            !state.loggedIn -> Column(
+                modifier = Modifier.fillMaxSize().padding(32.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center,
+            ) {
+                Text(
+                    text = "登录后查看我的订单",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = TextPrimary,
+                )
+                Spacer(modifier = Modifier.height(12.dp))
+                Button(
+                    onClick = onGoLogin,
+                    shape = RoundedCornerShape(percent = 50),
+                    colors = ButtonDefaults.buttonColors(containerColor = BrandGreen, contentColor = Color.White),
+                ) {
+                    Text(text = "去登录")
+                }
+            }
             state.loading -> Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 CircularProgressIndicator(color = BrandGreen)
             }
-            state.error != null -> Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            state.error != null -> Column(
+                modifier = Modifier.fillMaxSize().padding(32.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center,
+            ) {
                 Text(text = state.error, color = TextSecondary)
+                Spacer(modifier = Modifier.height(12.dp))
+                Button(
+                    onClick = onRefresh,
+                    shape = RoundedCornerShape(percent = 50),
+                    colors = ButtonDefaults.buttonColors(containerColor = BrandGreen, contentColor = Color.White),
+                ) {
+                    Text(text = "重试")
+                }
             }
             else -> PullToRefreshBox(
                 isRefreshing = state.refreshing,

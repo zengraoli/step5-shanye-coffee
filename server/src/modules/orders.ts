@@ -161,6 +161,17 @@ function serializeOrder(db: Db, order: OrderRow): OrderDetail {
   const items = db
     .prepare('SELECT * FROM order_items WHERE order_id = ? ORDER BY id')
     .all(order.id) as unknown as OrderItemRow[]
+  // 订单项对应的商品分类名（客户端按分类绘制自绘插画）
+  const categoryNames = new Map(
+    (
+      db
+        .prepare(
+          `SELECT p.id AS product_id, c.name AS category_name
+           FROM products p JOIN categories c ON c.id = p.category_id`,
+        )
+        .all() as unknown as { product_id: number; category_name: string }[]
+    ).map((row) => [row.product_id, row.category_name]),
+  )
   let coupon: OrderDetail['coupon'] = null
   if (order.member_coupon_id !== null) {
     const row = db
@@ -196,6 +207,7 @@ function serializeOrder(db: Db, order: OrderRow): OrderDetail {
         productId: item.product_id,
         productName: item.product_name,
         specText,
+        categoryName: categoryNames.get(item.product_id) ?? '',
         unitPrice: item.unit_price,
         quantity: item.quantity,
         amount: item.unit_price * item.quantity,

@@ -9,10 +9,16 @@ object Routes {
     const val ORDERS = "orders"
     const val ORDER_DETAIL = "order-detail"
     const val PROFILE = "profile"
+    /** 会员优惠券（领券中心 / 我的优惠券） */
+    const val COUPONS = "coupons"
 
     const val ARG_ORDER_ID = "orderId"
 
-    fun orderDetail(orderId: Long): String = "$ORDER_DETAIL?$ARG_ORDER_ID=$orderId"
+    /** 订单详情使用路径参数，深链 shanye://order-detail/123 才能命中 */
+    fun orderDetail(orderId: Long): String = "$ORDER_DETAIL/$orderId"
+
+    /** 订单详情的路由模板 */
+    const val ORDER_DETAIL_PATTERN = "$ORDER_DETAIL/{$ARG_ORDER_ID}"
 }
 
 /** 底部导航四个 Tab */

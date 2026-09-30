@@ -2,7 +2,11 @@ package com.shanye.coffee.ui.home
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -10,6 +14,9 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -20,12 +27,21 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Surface
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -33,6 +49,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Dialog
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.shanye.coffee.data.remote.dto.ProductDto
@@ -76,10 +93,14 @@ fun HomeScreen(
         onStoreSelect = viewModel::selectStore,
         onGoOrder = onGoOrder,
         onProductClick = onProductClick,
+        onRefresh = viewModel::refresh,
+        onSearchClick = viewModel::openSearch,
+        onSearchDismiss = viewModel::closeSearch,
     )
 }
 
 @Composable
+@OptIn(ExperimentalMaterial3Api::class)
 internal fun HomeScreenContent(
     state: HomeUiState,
     onStoreClick: () -> Unit,
@@ -87,6 +108,10 @@ internal fun HomeScreenContent(
     onStoreSelect: (StoreDto) -> Unit,
     onGoOrder: (String) -> Unit,
     onProductClick: (ProductDto) -> Unit,
+    onRefresh: () -> Unit = {},
+    onSearchClick: () -> Unit = {},
+    onSearchDismiss: () -> Unit = {},
+    onSearchQueryChange: (String) -> Unit = {},
 ) {
     if (state.loading) {
         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -95,17 +120,39 @@ internal fun HomeScreenContent(
         return
     }
     if (state.error != null) {
-        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            Text(text = state.error, color = TextSecondary, style = MaterialTheme.typography.bodyMedium)
+        Column(
+            modifier = Modifier.fillMaxSize().padding(32.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center,
+        ) {
+            Text(
+                text = state.error,
+                color = TextSecondary,
+                style = MaterialTheme.typography.bodyMedium,
+            )
+            Spacer(modifier = Modifier.height(12.dp))
+            Button(
+                onClick = onRefresh,
+                shape = RoundedCornerShape(percent = 50),
+                colors = ButtonDefaults.buttonColors(containerColor = BrandGreen, contentColor = Color.White),
+            ) {
+                Text(text = "重试")
+            }
         }
         return
     }
 
+    PullToRefreshBox(
+        isRefreshing = state.refreshing,
+        onRefresh = onRefresh,
+        modifier = Modifier.fillMaxSize(),
+    ) {
     Column(
         modifier = Modifier
             .fillMaxSize()
             .background(CreamBackground)
-            .padding(horizontal = 16.dp),
+            .padding(horizontal = 16.dp)
+            .verticalScroll(rememberScrollState()),
     ) {
         Spacer(modifier = Modifier.height(12.dp))
 
@@ -145,9 +192,11 @@ internal fun HomeScreenContent(
             Spacer(modifier = Modifier.width(8.dp))
             Icon(
                 imageVector = Icons.Filled.Search,
-                contentDescription = "搜索",
+                contentDescription = "搜索商品",
                 tint = TextPrimary,
-                modifier = Modifier.size(22.dp),
+                modifier = Modifier
+                    .size(22.dp)
+                    .clickable(onClick = onSearchClick),
             )
         }
 
@@ -201,13 +250,83 @@ internal fun HomeScreenContent(
 
         Spacer(modifier = Modifier.height(12.dp))
 
-        LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            items(state.featured, key = { it.id }) { product ->
+        Row(
+            modifier = Modifier.horizontalScroll(rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            state.featured.forEach { product ->
                 FeaturedProductCard(product = product, onClick = { onProductClick(product) })
             }
         }
 
         Spacer(modifier = Modifier.height(24.dp))
+    }
+    }
+
+    // 商品搜索：按名称 / 副标题过滤，点击进入点单页对应商品
+    if (state.searchOpen) {
+        Dialog(onDismissRequest = onSearchDismiss) {
+            Surface(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp),
+                shape = RoundedCornerShape(20.dp),
+                color = MaterialTheme.colorScheme.surface,
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    var query by androidx.compose.runtime.saveable.rememberSaveable {
+                        androidx.compose.runtime.mutableStateOf("")
+                    }
+                    OutlinedTextField(
+                        value = query,
+                        onValueChange = { query = it },
+                        label = { Text(text = "搜索商品") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    Spacer(modifier = Modifier.height(12.dp))
+                    val result = state.featured.filter { product ->
+                        query.isBlank() ||
+                            product.name.contains(query, ignoreCase = true) ||
+                            product.subtitle.contains(query, ignoreCase = true)
+                    }
+                    if (result.isEmpty()) {
+                        Text(
+                            text = "没有找到相关商品",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = TextSecondary,
+                        )
+                    } else {
+                        Column(modifier = Modifier.heightIn(max = 360.dp).verticalScroll(rememberScrollState())) {
+                            result.forEach { product ->
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clickable {
+                                            onSearchDismiss()
+                                            onProductClick(product)
+                                        }
+                                        .padding(vertical = 10.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                ) {
+                                    Text(
+                                        text = product.name,
+                                        style = MaterialTheme.typography.bodyLarge,
+                                        color = TextPrimary,
+                                        modifier = Modifier.weight(1f),
+                                    )
+                                    Text(
+                                        text = MoneyFormat.yuan(product.basePrice.toLong()),
+                                        style = MaterialTheme.typography.labelLarge,
+                                        color = TerracottaDark,
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
     }
 
     if (state.storePickerOpen) {

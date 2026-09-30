@@ -94,13 +94,13 @@ object CartStore {
         var discount = 0
         val grouped = _lines.value.filter { it.productId in promoIds }.groupBy { it.productId }
         for (lines in grouped.values) {
-            var seen = 0
-            for (line in lines) {
-                repeat(line.quantity) {
-                    seen += 1
-                    if (seen % 2 == 0) {
-                        discount += line.unitPrice / 2
-                    }
+            // 展开成单杯并按单价从高到低排序：第 2、4… 杯半价，
+            // 即半价的是更便宜的那杯，金额与加购顺序无关（与服务端一致）
+            val units = lines.flatMap { line -> List(line.quantity) { line.unitPrice } }
+                .sortedDescending()
+            units.forEachIndexed { index, price ->
+                if (index % 2 == 1) {
+                    discount += price / 2
                 }
             }
         }

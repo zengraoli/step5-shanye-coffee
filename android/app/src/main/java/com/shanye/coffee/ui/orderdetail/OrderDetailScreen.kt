@@ -20,11 +20,17 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -59,6 +65,7 @@ private val PROGRESS_STEPS = listOf(
 /**
  * 订单详情页（设计稿 AD5）：取餐码、订单进度、订单信息。
  */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun OrderDetailScreen(orderId: Long, onBack: () -> Unit, onGoLogin: () -> Unit = {}) {
     val container = LocalAppContainer.current
@@ -72,18 +79,44 @@ fun OrderDetailScreen(orderId: Long, onBack: () -> Unit, onGoLogin: () -> Unit =
         },
     )
     val state by viewModel.state.collectAsStateWithLifecycle()
+    var confirmCancel by androidx.compose.runtime.saveable.rememberSaveable { androidx.compose.runtime.mutableStateOf(false) }
+
+    if (confirmCancel) {
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { confirmCancel = false },
+            title = { Text(text = "取消订单") },
+            text = { Text(text = "取消后订单将关闭，无法恢复。确定取消这笔订单吗？") },
+            confirmButton = {
+                androidx.compose.material3.TextButton(
+                    onClick = {
+                        confirmCancel = false
+                        viewModel.cancel()
+                    },
+                ) {
+                    Text(text = "确定取消")
+                }
+            },
+            dismissButton = {
+                androidx.compose.material3.TextButton(onClick = { confirmCancel = false }) {
+                    Text(text = "再想想")
+                }
+            },
+        )
+    }
 
     OrderDetailScreenContent(
         state = state,
         onBack = onBack,
-        onRefresh = viewModel::load,
+        onRefresh = viewModel::refresh,
         onPay = { viewModel.pay() },
         onCancel = viewModel::cancel,
         onConfirm = viewModel::confirm,
         onGoLogin = onGoLogin,
+        onCancelRequest = { confirmCancel = true },
     )
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun OrderDetailScreenContent(
     state: OrderDetailUiState,
@@ -93,6 +126,7 @@ internal fun OrderDetailScreenContent(
     onCancel: () -> Unit,
     onConfirm: () -> Unit,
     onGoLogin: () -> Unit,
+    onCancelRequest: () -> Unit = onCancel,
 ) {
     Column(
         modifier = Modifier
@@ -138,7 +172,28 @@ internal fun OrderDetailScreenContent(
                     ActionButton(text = "重试", onClick = onRefresh)
                 }
             }
-            else -> OrderDetailBody(state = state, onPay = onPay, onCancel = onCancel, onConfirm = onConfirm)
+            else -> PullToRefreshBox(
+                isRefreshing = state.refreshing,
+                onRefresh = onRefresh,
+                modifier = Modifier.fillMaxSize(),
+            ) {
+                OrderDetailBody(
+                    state = state,
+                    onPay = onPay,
+                    onCancel = onCancel,
+                    onConfirm = onConfirm,
+                    onCancelRequest = onCancelRequest,
+                )
+            }
+        }
+    }
+
+    // 订单进行中时自动刷新：后台推进到“制作中 / 待取餐”页面会跟着变
+    val status = state.order?.status
+    androidx.compose.runtime.LaunchedEffect(state.order?.id, status) {
+        while (status == "paid" || status == "making" || status == "pending_pay") {
+            kotlinx.coroutines.delay(10_000)
+            onRefresh()
         }
     }
 }
@@ -149,6 +204,7 @@ internal fun OrderDetailBody(
     onPay: () -> Unit,
     onCancel: () -> Unit,
     onConfirm: () -> Unit,
+    onCancelRequest: () -> Unit = onCancel,
 ) {
     val order = state.order ?: return
     val progressIndex = PROGRESS_STEPS.indexOfFirst { it.first == order.status }
@@ -326,7 +382,7 @@ internal fun OrderDetailBody(
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
             when (order.status) {
                 "pending_pay" -> {
-                    ActionButton(text = "取消订单", outlined = true, modifier = Modifier.weight(1f), onClick = onCancel)
+                    ActionButton(text = "取消订单", outlined = true, modifier = Modifier.weight(1f), onClick = onCancelRequest)
                     ActionButton(text = "模拟支付", modifier = Modifier.weight(1f), onClick = onPay)
                 }
                 "pickable" -> ActionButton(text = "确认取餐", modifier = Modifier.weight(1f), onClick = onConfirm)

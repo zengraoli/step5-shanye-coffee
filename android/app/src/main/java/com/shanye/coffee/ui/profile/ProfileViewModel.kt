@@ -21,6 +21,7 @@ data class ProfileUiState(
     val couponCount: Int = 0,
     val orderCount: Int = 0,
     val totalEarned: Int = 0,
+    val refreshing: Boolean = false,
     val loggedIn: Boolean = true,
 )
 
@@ -33,10 +34,20 @@ class ProfileViewModel(
     val state: StateFlow<ProfileUiState> = _state.asStateFlow()
 
     init {
-        if (MemberSession.isLoggedIn) {
-            load()
-        } else {
-            _state.update { it.copy(loading = false, loggedIn = false) }
+        viewModelScope.launch {
+            var loaded = false
+            MemberSession.profile.collect { profile ->
+                if (profile != null) {
+                    _state.update { it.copy(loggedIn = true) }
+                    load()
+                    loaded = true
+                } else if (MemberSession.restored.value) {
+                    _state.update { it.copy(loggedIn = false, loading = false, refreshing = false) }
+                }
+            }
+            if (!loaded && MemberSession.restored.value) {
+                _state.update { it.copy(loggedIn = false, loading = false) }
+            }
         }
     }
 
@@ -59,12 +70,14 @@ class ProfileViewModel(
                         couponCount = (couponsResult as? ApiResult.Ok)
                             ?.data?.count { coupon -> coupon.status == "unused" } ?: 0,
                         orderCount = (ordersResult as? ApiResult.Ok)?.data?.total ?: 0,
+                        refreshing = false,
                     )
                 }
             } else {
                 _state.update {
                     it.copy(
                         loading = false,
+                        refreshing = false,
                         error = (profileResult as? ApiResult.Err)?.error?.message ?: "加载失败，请稍后重试",
                     )
                 }
@@ -72,10 +85,18 @@ class ProfileViewModel(
         }
     }
 
+    /** 退出登录：清理本地会话与内存登录态 */
     fun logout() {
         viewModelScope.launch {
             memberRepository.logout()
+            MemberSession.clear()
         }
+    }
+
+    /** 下拉刷新 */
+    fun refresh() {
+        _state.update { it.copy(refreshing = true) }
+        load()
     }
 }
 

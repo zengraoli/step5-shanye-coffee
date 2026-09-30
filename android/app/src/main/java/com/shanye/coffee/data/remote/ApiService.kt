@@ -2,6 +2,7 @@ package com.shanye.coffee.data.remote
 
 import com.shanye.coffee.data.remote.dto.ApiEnvelope
 import com.shanye.coffee.data.remote.dto.CategoryDto
+import com.shanye.coffee.data.remote.dto.CouponTemplateDto
 import com.shanye.coffee.data.remote.dto.CreateOrderRequestDto
 import com.shanye.coffee.data.remote.dto.MemberCouponDto
 import com.shanye.coffee.data.remote.dto.MemberLoginRequestDto
@@ -59,9 +60,14 @@ interface ApiService {
     suspend fun products(
         @Query("category_id") categoryId: Long? = null,
         @Query("keyword") keyword: String? = null,
+        @Query("store_id") storeId: Long? = null,
         @Query("page") page: Int = 1,
         @Query("page_size") pageSize: Int = 60,
     ): Response<ApiEnvelope<ProductListDto>>
+
+    /** 可领取的券模板（公开） */
+    @GET("api/v1/coupons")
+    suspend fun couponTemplates(): Response<ApiEnvelope<List<CouponTemplateDto>>>
 
     // ---------- 活动 ----------
 

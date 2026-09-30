@@ -100,6 +100,8 @@ data class ProductDto(
     val basePrice: Int,
     @SerialName("onSale") val onSale: Boolean,
     val soldOut: Boolean,
+    /** 被单独标记售罄的门店 id 列表（售罄按门店隔离） */
+    val soldOutStoreIds: List<Long> = emptyList(),
     val sort: Int = 0,
     val specs: List<SpecGroupDto> = emptyList(),
 )
@@ -148,6 +150,10 @@ data class MemberCouponDto(
     val validTo: String,
     val status: String,
     val statusText: String,
+    /** 券模板是否停用（停用后显示“已失效”，不可用、不会被推荐） */
+    val templateStatus: String = "active",
+    /** 当前是否可用于下单 */
+    val usable: Boolean = true,
     val obtainedAt: String,
     val usedAt: String? = null,
 )
@@ -166,6 +172,24 @@ data class PointsSummaryDto(
     val profile: MemberProfileDto,
     val totalEarned: Int,
     val logs: List<PointsLogDto> = emptyList(),
+)
+
+// ---------- 可领取的券模板 ----------
+
+@Serializable
+data class CouponTemplateDto(
+    val id: Long,
+    val name: String,
+    val type: String,
+    val typeText: String,
+    val thresholdFen: Int,
+    val reduceFen: Int,
+    val discountPercent: Int = 100,
+    val maxReduceFen: Int = 0,
+    val validDays: Int = 7,
+    val total: Int = 0,
+    val remaining: Int = 0,
+    val status: String = "active",
 )
 
 // ---------- 订单 ----------
@@ -191,6 +215,8 @@ data class OrderItemDto(
     val productId: Long,
     val productName: String,
     val specText: String,
+    /** 商品分类名（用于按分类绘制自绘插画） */
+    val categoryName: String = "",
     val unitPrice: Int,
     val quantity: Int,
     val amount: Int,

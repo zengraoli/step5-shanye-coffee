@@ -27,10 +27,21 @@ class OrdersViewModel(private val orderRepository: OrderRepository) : ViewModel(
     val state: StateFlow<OrdersUiState> = _state.asStateFlow()
 
     init {
-        if (MemberSession.isLoggedIn) {
-            load()
-        } else {
-            _state.update { it.copy(loading = false, loggedIn = false) }
+        // 登录态驱动：冷启动等本地会话恢复后再加载；登录 / 退出都实时刷新
+        viewModelScope.launch {
+            var loaded = false
+            MemberSession.profile.collect { profile ->
+                if (profile != null) {
+                    _state.update { it.copy(loggedIn = true) }
+                    load()
+                    loaded = true
+                } else if (MemberSession.restored.value) {
+                    _state.update { it.copy(loggedIn = false, loading = false, refreshing = false, orders = emptyList()) }
+                }
+            }
+            if (!loaded && MemberSession.restored.value) {
+                _state.update { it.copy(loggedIn = false, loading = false) }
+            }
         }
     }
 

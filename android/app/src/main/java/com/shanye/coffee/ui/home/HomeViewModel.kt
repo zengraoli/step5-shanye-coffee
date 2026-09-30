@@ -24,6 +24,8 @@ data class HomeUiState(
     val promo: PromoActivityDto? = null,
     val featured: List<ProductDto> = emptyList(),
     val storePickerOpen: Boolean = false,
+    val searchOpen: Boolean = false,
+    val refreshing: Boolean = false,
     val loggedIn: Boolean = false,
 )
 
@@ -41,12 +43,26 @@ class HomeViewModel(private val catalogRepository: CatalogRepository) : ViewMode
         load()
     }
 
+    /** 下拉刷新 / 重试：重新拉门店（营业状态）与商品 */
+    fun refresh() {
+        _state.update { it.copy(refreshing = true, error = null) }
+        viewModelScope.launch {
+            loadInternal()
+            _state.update { it.copy(refreshing = false) }
+        }
+    }
+
     fun load() {
         _state.update { it.copy(loading = true, error = null) }
         viewModelScope.launch {
-            val storesResult = catalogRepository.stores()
-            val promoResult = catalogRepository.promo()
-            val productsResult = catalogRepository.products(pageSize = 60)
+            loadInternal()
+        }
+    }
+
+    private suspend fun loadInternal() {
+        val storesResult = catalogRepository.stores()
+        val promoResult = catalogRepository.promo()
+        val productsResult = catalogRepository.products(pageSize = 60)
             if (storesResult is ApiResult.Ok && productsResult is ApiResult.Ok) {
                 val stores = storesResult.data
                 val promo = (promoResult as? ApiResult.Ok)?.data?.activity
@@ -65,7 +81,7 @@ class HomeViewModel(private val catalogRepository: CatalogRepository) : ViewMode
                         stores = stores,
                         currentStore = current,
                         promo = activePromo,
-                        featured = pickFeatured(productsResult.data.list),
+                        featured = pickFeatured(productsResult.data.list, storeId = current?.id),
                         loggedIn = MemberSession.isLoggedIn,
                     )
                 }
@@ -77,7 +93,6 @@ class HomeViewModel(private val catalogRepository: CatalogRepository) : ViewMode
                 }
                 _state.update { it.copy(loading = false, error = message) }
             }
-        }
     }
 
     fun openStorePicker() {
@@ -91,13 +106,31 @@ class HomeViewModel(private val catalogRepository: CatalogRepository) : ViewMode
     fun selectStore(store: StoreDto) {
         OrderSession.selectStore(store)
         _state.update { it.copy(currentStore = store, storePickerOpen = false) }
+        // 换门店后按新门店口径刷新商品（售罄状态会变）
+        viewModelScope.launch {
+            val productsResult = catalogRepository.products(pageSize = 60, storeId = store.id)
+            if (productsResult is ApiResult.Ok) {
+                _state.update {
+                    it.copy(featured = pickFeatured(productsResult.data.list, storeId = store.id))
+                }
+            }
+        }
+    }
+
+    fun openSearch() {
+        _state.update { it.copy(searchOpen = true) }
+    }
+
+    fun closeSearch() {
+        _state.update { it.copy(searchOpen = false) }
     }
 }
 
-/** 当季推荐：优先“招牌 / 限定 / 人气 / 新品”，补足 6 个 */
-internal fun pickFeatured(list: List<ProductDto>): List<ProductDto> {
+/** 当季推荐：优先“招牌 / 限定 / 人气 / 新品”，过滤已售罄商品，补足 6 个 */
+internal fun pickFeatured(list: List<ProductDto>, storeId: Long? = null): List<ProductDto> {
     val tags = listOf("招牌", "限定", "人气", "新品")
-    val preferred = list.filter { product -> tags.any { tag -> product.subtitle.contains(tag) } }
-    val rest = list.filter { product -> !preferred.contains(product) }
+    val available = list.filter { product -> !product.soldOut && product.onSale }
+    val preferred = available.filter { product -> tags.any { tag -> product.subtitle.contains(tag) } }
+    val rest = available.filter { product -> !preferred.contains(product) }
     return (preferred + rest).take(6)
 }

@@ -17,6 +17,7 @@ data class OrderDetailUiState(
     val error: String? = null,
     val order: OrderDto? = null,
     val acting: Boolean = false,
+    val refreshing: Boolean = false,
     val loggedIn: Boolean = true,
 )
 
@@ -29,10 +30,20 @@ class OrderDetailViewModel(
     val state: StateFlow<OrderDetailUiState> = _state.asStateFlow()
 
     init {
-        if (MemberSession.isLoggedIn) {
-            load()
-        } else {
-            _state.update { it.copy(loading = false, loggedIn = false) }
+        viewModelScope.launch {
+            var loaded = false
+            MemberSession.profile.collect { profile ->
+                if (profile != null) {
+                    _state.update { it.copy(loggedIn = true) }
+                    load()
+                    loaded = true
+                } else if (MemberSession.restored.value) {
+                    _state.update { it.copy(loggedIn = false, loading = false, order = null) }
+                }
+            }
+            if (!loaded && MemberSession.restored.value) {
+                _state.update { it.copy(loggedIn = false, loading = false, order = null) }
+            }
         }
     }
 
@@ -42,13 +53,19 @@ class OrderDetailViewModel(
         viewModelScope.launch {
             when (val result = orderRepository.detail(orderId)) {
                 is ApiResult.Ok -> _state.update {
-                    it.copy(loading = false, error = null, order = result.data)
+                    it.copy(loading = false, refreshing = false, error = null, order = result.data)
                 }
                 is ApiResult.Err -> _state.update {
-                    it.copy(loading = false, error = result.error.message)
+                    it.copy(loading = false, refreshing = false, error = result.error.message)
                 }
             }
         }
+    }
+
+    /** 下拉刷新 */
+    fun refresh() {
+        _state.update { it.copy(refreshing = true) }
+        load()
     }
 
     fun pay(onPaid: () -> Unit = {}) {

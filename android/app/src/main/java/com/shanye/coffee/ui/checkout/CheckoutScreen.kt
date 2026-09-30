@@ -19,6 +19,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
@@ -239,12 +240,18 @@ internal fun CheckoutBody(
                     tint = TextSecondary,
                 )
             }
+            // “不使用优惠券”：与其它选项互斥，可反复切换
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+            NoCouponRow(
+                selected = quote.selectedCouponId == null,
+                onSelect = onClearCoupon,
+            )
             quote.coupons.filter { it.usable && it.discountFen > 0 }.forEach { coupon ->
                 HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                 CouponOptionRow(
                     coupon = coupon,
                     selected = quote.selectedCouponId == coupon.id,
-                    isBest = quote.bestCouponId == coupon.id,
+                    isBest = quote.bestCouponId == coupon.id && quote.selectedCouponId == coupon.id,
                     onSelect = { onSelectCoupon(coupon.id) },
                 )
             }
@@ -377,7 +384,7 @@ internal fun OrderTypeToggle(orderType: String, onSelect: (String) -> Unit) {
 @Composable
 internal fun OrderItemRow(item: OrderItemDto) {
     Row(verticalAlignment = Alignment.CenterVertically) {
-        val (bg, drink) = categoryArtColors("咖啡")
+        val (bg, drink) = categoryArtColors(item.categoryName)
         Box(
             modifier = Modifier
                 .size(52.dp)
@@ -401,6 +408,57 @@ internal fun OrderItemRow(item: OrderItemDto) {
             style = MaterialTheme.typography.titleSmall,
             color = TextPrimary,
         )
+    }
+}
+
+/** “不使用优惠券”选项行 */
+@Composable
+internal fun NoCouponRow(
+    selected: Boolean,
+    onSelect: () -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onSelect)
+            .padding(16.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(text = "不使用优惠券", style = MaterialTheme.typography.titleSmall, color = TextPrimary)
+            Text(
+                text = "按原价与活动优惠结算",
+                style = MaterialTheme.typography.bodySmall,
+                color = TextSecondary,
+            )
+        }
+        RadioDot(selected = selected)
+    }
+}
+
+/** 单选圆点（与设计稿一致：选中为品牌绿实心圆） */
+@Composable
+internal fun RadioDot(selected: Boolean) {
+    Box(
+        modifier = Modifier
+            .size(20.dp)
+            .clip(RoundedCornerShape(percent = 50))
+            .background(if (selected) BrandGreen else Color.Transparent)
+            .border(
+                width = if (selected) 0.dp else 1.5.dp,
+                color = if (selected) Color.Transparent else TextSecondary,
+                shape = RoundedCornerShape(percent = 50),
+            ),
+        contentAlignment = Alignment.Center,
+    ) {
+        if (selected) {
+            Icon(
+                imageVector = Icons.Filled.Check,
+                contentDescription = null,
+                tint = Color.White,
+                modifier = Modifier.size(13.dp),
+            )
+        }
     }
 }
 

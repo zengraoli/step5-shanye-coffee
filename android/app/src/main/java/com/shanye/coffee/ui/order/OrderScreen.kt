@@ -15,8 +15,12 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -33,6 +37,8 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.lifecycle.ViewModel
 import com.shanye.coffee.data.CartLine
 import com.shanye.coffee.data.remote.dto.ProductDto
+import com.shanye.coffee.ui.home.StorePickerSheet
+import com.shanye.coffee.data.remote.dto.StoreDto
 import com.shanye.coffee.ui.LocalAppContainer
 import com.shanye.coffee.ui.components.ProductCupArt
 import com.shanye.coffee.ui.components.categoryArtColors
@@ -49,20 +55,26 @@ import com.shanye.coffee.util.MoneyFormat
  * 点单页（设计稿 AD3）：分类 Tab、商品列表、规格底部弹窗、售罄状态、购物车条。
  */
 @Composable
-fun OrderScreen(onGoCheckout: () -> Unit) {
+fun OrderScreen(
+    focusProductId: Long = 0L,
+    onGoCheckout: () -> Unit,
+) {
     val container = LocalAppContainer.current
     val viewModel: OrderViewModel = viewModel(
         factory = object : androidx.lifecycle.ViewModelProvider.Factory {
             override fun <T : ViewModel> create(
                 modelClass: Class<T>,
                 extras: androidx.lifecycle.viewmodel.CreationExtras,
-            ): T = OrderViewModel(container.catalogRepository) as T
+            ): T = OrderViewModel(container.catalogRepository, focusProductId) as T
         },
     )
     val state by viewModel.state.collectAsStateWithLifecycle()
 
     OrderScreenContent(
         state = state,
+        onStoreClick = viewModel::openStorePicker,
+        onStorePickerDismiss = viewModel::closeStorePicker,
+        onStoreSelect = viewModel::selectStore,
         onSelectCategory = viewModel::selectCategory,
         onSelectOrderType = viewModel::setOrderType,
         onProductClick = viewModel::openSpec,
@@ -79,6 +91,9 @@ fun OrderScreen(onGoCheckout: () -> Unit) {
 @Composable
 internal fun OrderScreenContent(
     state: OrderUiState,
+    onStoreClick: () -> Unit = {},
+    onStorePickerDismiss: () -> Unit = {},
+    onStoreSelect: (StoreDto) -> Unit = {},
     onSelectCategory: (Long) -> Unit,
     onSelectOrderType: (String) -> Unit,
     onProductClick: (ProductDto) -> Unit,
@@ -109,6 +124,45 @@ internal fun OrderScreenContent(
                 modifier = Modifier.weight(1f),
             )
             OrderTypeToggle(orderType = state.orderType, onSelect = onSelectOrderType)
+        }
+
+        // 当前门店（可切换）：售罄与休息状态按门店生效
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 6.dp)
+                .clip(RoundedCornerShape(percent = 50))
+                .clickable(onClick = onStoreClick),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(
+                imageVector = Icons.Filled.LocationOn,
+                contentDescription = "切换门店",
+                tint = BrandGreen,
+                modifier = Modifier.size(16.dp),
+            )
+            Spacer(modifier = Modifier.width(4.dp))
+            Text(
+                text = state.currentStore?.name ?: "选择门店",
+                style = MaterialTheme.typography.bodyMedium,
+                color = TextPrimary,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f),
+            )
+            state.currentStore?.let { store ->
+                Text(
+                    text = store.statusText,
+                    style = MaterialTheme.typography.labelMedium,
+                    color = if (store.status == "open") BrandGreen else TerracottaDark,
+                )
+            }
+            Icon(
+                imageVector = Icons.Filled.KeyboardArrowDown,
+                contentDescription = null,
+                tint = TextSecondary,
+                modifier = Modifier.size(18.dp),
+            )
         }
 
         // 分类 Tab
@@ -171,6 +225,16 @@ internal fun OrderScreenContent(
                 }
             }
         }
+    }
+
+    // 门店选择弹层
+    if (state.storePickerOpen && state.currentStore != null) {
+        StorePickerSheet(
+            stores = state.stores,
+            currentStoreId = state.currentStore?.id,
+            onDismiss = onStorePickerDismiss,
+            onSelect = onStoreSelect,
+        )
     }
 
     // 规格弹窗
@@ -329,6 +393,12 @@ internal fun TagPill(text: String, background: Color, color: Color) {
             .background(background)
             .padding(horizontal = 8.dp, vertical = 2.dp),
     ) {
-        Text(text = text, style = MaterialTheme.typography.labelSmall, color = color)
+        Text(
+            text = text,
+            style = MaterialTheme.typography.labelSmall,
+            color = color,
+            maxLines = 1,
+            softWrap = false,
+        )
     }
 }
