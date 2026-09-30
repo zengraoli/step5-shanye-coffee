@@ -9,10 +9,12 @@ const { db, seededCredentials } = openDb({ path: defaultDbPath() })
 const app = await buildApp({ logger: true, db })
 
 if (seededCredentials.length > 0) {
-  app.log.info('已初始化种子数据，后台账号初始密码如下（仅本次显示，请尽快登录后修改）：')
+  // 生产环境不应把口令写进日志：仅在未显式设置密码（随机生成）时输出一次
+  app.log.info('已初始化种子数据，后台账号初始密码为随机生成并仅在本次控制台显示一次：')
   for (const credential of seededCredentials) {
     app.log.info(`  ${credential.username}（${credential.role}）：${credential.password}`)
   }
+  app.log.info('提示：请用 ADMIN_PASSWORD / STAFF_PASSWORD 指定固定口令，避免依赖随机口令。')
 }
 
 const shutdown = async (signal: string): Promise<void> => {
