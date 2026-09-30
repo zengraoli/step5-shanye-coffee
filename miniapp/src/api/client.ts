@@ -79,7 +79,8 @@ let redirectingToLogin = false
 
 /** 当前页面路径：用于登录后回跳 */
 function currentPagePath(): string {
-  const pages = getCurrentPages()
+  // uni.getCurrentPages() 是 uni-app 提供的页面栈 API
+  const pages = uni.getCurrentPages()
   // uni-app 的页面实例：route 为页面路径，options 为启动参数
   const current = pages[pages.length - 1] as unknown as
     | { route?: string; options?: Record<string, string | undefined> }
