@@ -34,11 +34,44 @@ async function load() {
     summary.value = points
     coupons.value = couponList
     recentOrders.value = orderResult.list
+    // 用服务端最新资料覆盖本地缓存：支付后积分立即刷新，不用重新登录
+    if (points.profile) {
+      syncProfile(points.profile)
+    }
   } catch (err) {
+    if (err instanceof ApiError && err.code === 10002) {
+      goLogin()
+      return
+    }
     error.value = err instanceof ApiError ? err.message : '加载失败，请稍后重试'
   } finally {
     loading.value = false
   }
+}
+
+/** 用服务端返回的会员资料刷新本地登录态 */
+function syncProfile(next: PointsSummary['profile']) {
+  if (!next) {
+    return
+  }
+  const { updateProfile } = useAuth()
+  updateProfile(next)
+}
+
+const onLogout = () => {
+  uni.showModal({
+    title: '退出登录',
+    content: '退出后需要重新验证手机号',
+    confirmText: '退出',
+    success: ({ confirm }) => {
+      if (!confirm) {
+        return
+      }
+      logout()
+      cart.clear()
+      uni.reLaunch({ url: '/pages/index/index' })
+    },
+  })
 }
 
 onMounted(load)
@@ -56,12 +89,17 @@ const goOrders = () => {
   uni.reLaunch({ url: '/pages/orders/orders' })
 }
 
+/** 领券中心：可领取券模板 + 我的券 */
+const goCoupons = () => {
+  uni.navigateTo({ url: '/pages/coupons/coupons' })
+}
+
 const goOrder = () => {
   uni.reLaunch({ url: '/pages/order/order' })
 }
 
 const goStory = () => {
-  uni.reLaunch({ url: '/pages/index/index' })
+  uni.reLaunch({ url: '/pages/story/story' })
 }
 
 const openOrder = (id: number) => {
@@ -69,12 +107,6 @@ const openOrder = (id: number) => {
 }
 
 const unusedCoupons = computed(() => coupons.value.filter((item) => item.status === 'unused'))
-
-const onLogout = () => {
-  logout()
-  cart.clear()
-  uni.showToast({ title: '已退出登录', icon: 'none' })
-}
 
 /** 优惠券规则 */
 function couponRule(coupon: MemberCoupon): string {
@@ -231,6 +263,10 @@ function couponRule(coupon: MemberCoupon): string {
 
     <!-- 其他 -->
     <view class="menu">
+      <view class="menu__item" @click="goCoupons">
+        <text>领券中心</text>
+        <text class="menu__arrow">›</text>
+      </view>
       <view class="menu__item" @click="goStory">
         <text>品牌故事</text>
         <text class="menu__arrow">›</text>

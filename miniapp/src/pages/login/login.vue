@@ -1,11 +1,9 @@
 <script setup lang="ts">
 import { ref } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { onLoad } from '@dcloudio/uni-app'
 import { useAuth } from '@/composables/useAuth'
 import { ApiError } from '@/api/client'
 
-const router = useRouter()
-const route = useRoute()
 const { login, sendCode } = useAuth()
 
 const phone = ref('')
@@ -15,9 +13,19 @@ const tip = ref('')
 const submitting = ref(false)
 const sending = ref(false)
 
-const redirect = () => {
-  const target = route.query.redirect
-  return typeof target === 'string' && target.startsWith('/pages/') ? target : '/pages/profile/profile'
+/** 登录成功后回跳的来源页（仅允许站内 pages 路径，防开放重定向） */
+let redirectTarget = '/pages/profile/profile'
+onLoad((query) => {
+  const target = query?.redirect
+  redirectTarget =
+    typeof target === 'string' && target.startsWith('/pages/') ? target : '/pages/profile/profile'
+})
+
+const redirect = () => redirectTarget
+
+/** 用 redirectTo 回跳：不堆页面栈，避免登录页反复入栈 */
+function redirectTo(url: string) {
+  uni.redirectTo({ url })
 }
 
 const onSendCode = async () => {
@@ -54,7 +62,7 @@ const onSubmit = async () => {
     await login(phone.value, code.value)
     uni.showToast({ title: '登录成功', icon: 'success' })
     setTimeout(() => {
-      router.replace(redirect())
+      redirectTo(redirect())
     }, 400)
   } catch (err) {
     error.value = err instanceof ApiError ? err.message : '登录失败，请稍后重试'
@@ -231,12 +239,23 @@ const onSubmit = async () => {
 .field__input {
   box-sizing: border-box;
   width: 100%;
+  /* 显式高度：小程序里只靠 padding + font-size 会让可编辑区塌陷成一两条像素 */
+  height: 88rpx;
+  min-height: 88rpx;
+  line-height: 86rpx;
   border: 1rpx solid $color-line-strong;
   border-radius: $radius-md;
-  padding: $space-2 $space-3;
+  padding: 0 $space-3;
   background: $color-bg;
   font-size: 28rpx;
   color: $color-text;
+}
+
+/* 验证码输入框同一高度，保证与手机号输入框对齐 */
+.field__row .field__input {
+  height: 88rpx;
+  min-height: 88rpx;
+  line-height: 86rpx;
 }
 
 .field__row {

@@ -60,7 +60,14 @@ export function fetchCategories(): Promise<Category[]> {
 
 /** 商品列表（仅上架商品） */
 export function fetchProducts(
-  params: { categoryId?: number; keyword?: string; page?: number; pageSize?: number } = {},
+  params: {
+    categoryId?: number
+    keyword?: string
+    page?: number
+    pageSize?: number
+    /** 门店 id：传入后售罄状态按该门店返回（售罄按门店隔离） */
+    storeId?: number
+  } = {},
 ): Promise<ProductList> {
   const query: string[] = []
   if (params.categoryId) {
@@ -68,6 +75,9 @@ export function fetchProducts(
   }
   if (params.keyword) {
     query.push(`keyword=${encodeURIComponent(params.keyword)}`)
+  }
+  if (params.storeId) {
+    query.push(`store_id=${params.storeId}`)
   }
   query.push(`page=${params.page ?? 1}`)
   query.push(`page_size=${params.pageSize ?? 60}`)

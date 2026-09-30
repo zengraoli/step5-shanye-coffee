@@ -1,5 +1,6 @@
 /** 会员接口：登录、资料、积分、优惠券、订单 */
 import { apiFetch, type MemberProfile } from './client'
+import { formatMoney } from '@/utils/format'
 
 export interface LoginResult {
   token: string
@@ -20,6 +21,10 @@ export interface MemberCoupon {
   validTo: string
   status: 'unused' | 'used' | 'expired'
   statusText: string
+  /** 券模板是否停用（停用后显示“已失效”，不可用、不会被推荐） */
+  templateStatus?: 'active' | 'inactive'
+  /** 当前是否可用于下单 */
+  usable?: boolean
   obtainedAt: string
   usedAt: string | null
 }
@@ -98,12 +103,47 @@ export function fetchPointsSummary(): Promise<PointsSummary> {
 }
 
 /** 我的优惠券 */
+/** 可领取的券模板 */
+export interface CouponTemplate {
+  id: number
+  name: string
+  type: 'full_reduction' | 'discount'
+  typeText: string
+  thresholdFen: number
+  reduceFen: number
+  discountPercent: number
+  maxReduceFen: number
+  validDays: number
+  total: number
+  remaining: number
+  status: 'active' | 'inactive'
+}
+
+/** 券模板规则文案 */
+export function couponRule(coupon: Pick<CouponTemplate, 'type' | 'thresholdFen' | 'reduceFen' | 'discountPercent' | 'maxReduceFen'>): string {
+  if (coupon.type === 'full_reduction') {
+    return `满 ${formatMoney(coupon.thresholdFen)} 减 ${formatMoney(coupon.reduceFen)}`
+  }
+  const max = coupon.maxReduceFen > 0 ? `，最高减 ${formatMoney(coupon.maxReduceFen)}` : ''
+  return `${(coupon.discountPercent / 10).toFixed(1)} 折（满 ${formatMoney(coupon.thresholdFen)} 可用${max}）`
+}
+
 export function fetchMemberCoupons(status?: 'unused' | 'used' | 'expired'): Promise<MemberCoupon[]> {
   const query = status ? `?status=${status}` : ''
   return apiFetch<MemberCoupon[]>(`/api/v1/members/me/coupons${query}`)
 }
 
 /** 我的订单 */
+/** 可领取的券模板（公开接口，登录后才能领取） */
+export function fetchClaimableCoupons(): Promise<CouponTemplate[]> {
+  return apiFetch<CouponTemplate[]>('/api/v1/coupons')
+}
+
+/** 领取优惠券 */
+export function claimCoupon(id: number): Promise<MemberCoupon> {
+  return apiFetch<MemberCoupon>(`/api/v1/coupons/${id}/claim`, { method: 'POST' })
+}
+
 export function fetchMemberOrders(
   params: { status?: string; page?: number; pageSize?: number } = {},
 ): Promise<OrderList> {

@@ -103,7 +103,7 @@ export async function productRoutes(app: FastifyInstance): Promise<void> {
     async (request, reply) => {
       const { category_id: categoryId, keyword } = request.query
       const storeId = readStoreFilter(db, request.query.store_id)
-      const { page, pageSize, offset } = readPagination(request.query, { defaultSize: 20, maxSize: 50 })
+      const { page, pageSize, offset } = readPagination(request.query, { defaultSize: 20, maxSize: 100 })
 
       const conditions: string[] = ['p.on_sale = 1']
       const params: (string | number)[] = []

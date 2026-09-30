@@ -17,6 +17,7 @@ const STATUS_TABS = [
   { value: 'making', label: '制作中' },
   { value: 'pickable', label: '待取餐' },
   { value: 'completed', label: '已完成' },
+  { value: 'cancelled', label: '已取消' },
 ] as const
 
 const orders = ref<MemberOrder[]>([])
@@ -87,6 +88,20 @@ const quickPay = async (order: MemberOrder) => {
 
 const quickCancel = async (order: MemberOrder) => {
   if (acting.value) {
+    return
+  }
+  // 二次确认：避免误触取消待支付订单
+  const confirmed = await new Promise<boolean>((resolve) => {
+    uni.showModal({
+      title: '取消订单',
+      content: `确定取消订单 ${order.orderNo} 吗？取消后不能恢复。`,
+      confirmText: '取消订单',
+      cancelText: '再想想',
+      success: ({ confirm }) => resolve(confirm),
+      fail: () => resolve(false),
+    })
+  })
+  if (!confirmed) {
     return
   }
   acting.value = order.id

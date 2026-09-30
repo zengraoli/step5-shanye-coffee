@@ -20,13 +20,18 @@ onShow(() => {
   currentRoute.value = current?.route ?? ''
 })
 
-const activeKey = computed<TabKey>(() => {
+const activeKey = computed<TabKey | ''>(() => {
   const found = TABS.find((tab) => tab.path === currentRoute.value)
-  return found?.key ?? 'home'
+  // 非 Tab 页（订单详情 / 确认订单 / 登录等）不高亮任何 Tab，避免“高亮在首页”的误导
+  return found?.key ?? ''
 })
 
 const go = (path: string) => {
-  uni.reLaunch({ url: `/pages/${path.replace(/^pages\//, '').replace(/\//g, '/')}` })
+  const route = path.replace(/^pages\//, '')
+  if (route === currentRoute.value) {
+    return
+  }
+  uni.reLaunch({ url: `/pages/${route}` })
 }
 </script>
 

@@ -4,6 +4,8 @@ import {
   buildCartItem,
   cartCount,
   cartTotalFen,
+  payableFen,
+  promoDiscountFen,
   lineAmount,
   sameLine,
   setQuantity,
@@ -92,5 +94,40 @@ describe('购物车计算', () => {
     let cart = addToCart([], item({ quantity: 98 }))
     cart = addToCart(cart, item({ quantity: 5 }))
     expect(cart[0]!.quantity).toBe(99)
+  })
+})
+
+describe('第二杯半价（与 server 规则一致）', () => {
+  const cart = (items: CartItem[]): CartItem[] => items
+
+  test('同一商品第 2 杯半价，向下取整到分', () => {
+    const items = cart([
+      { productId: 1, productName: '山野拿铁', categoryName: '咖啡', spec: { cup: 'medium' }, specText: '中杯', unitPrice: 3500, quantity: 2 },
+    ])
+    expect(promoDiscountFen(items, [1])).toBe(1750)
+    expect(payableFen(items, [1])).toBe(5250)
+  })
+
+  test('多规格时半价较便宜那杯，与加购顺序无关', () => {
+    const mediumFirst = cart([
+      { productId: 1, productName: '山野拿铁', categoryName: '咖啡', spec: { cup: 'medium' }, specText: '中杯', unitPrice: 3200, quantity: 1 },
+      { productId: 1, productName: '山野拿铁', categoryName: '咖啡', spec: { cup: 'large' }, specText: '大杯', unitPrice: 3500, quantity: 1 },
+    ])
+    const largeFirst = cart([
+      { productId: 1, productName: '山野拿铁', categoryName: '咖啡', spec: { cup: 'large' }, specText: '大杯', unitPrice: 3500, quantity: 1 },
+      { productId: 1, productName: '山野拿铁', categoryName: '咖啡', spec: { cup: 'medium' }, specText: '中杯', unitPrice: 3200, quantity: 1 },
+    ])
+    expect(promoDiscountFen(mediumFirst, [1])).toBe(1600)
+    expect(promoDiscountFen(largeFirst, [1])).toBe(1600)
+  })
+
+  test('非适用商品与多商品分别计数', () => {
+    const items = cart([
+      { productId: 1, productName: '拿铁', categoryName: '咖啡', spec: {}, specText: '', unitPrice: 3000, quantity: 2 },
+      { productId: 13, productName: '可颂', categoryName: '轻食', spec: {}, specText: '', unitPrice: 2000, quantity: 2 },
+    ])
+    expect(promoDiscountFen(items, [1])).toBe(1500)
+    expect(promoDiscountFen(items, [1, 13])).toBe(2500)
+    expect(promoDiscountFen(items, [])).toBe(0)
   })
 })

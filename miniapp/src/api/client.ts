@@ -71,6 +71,51 @@ interface RequestOptions {
   token?: string | null
 }
 
+/** 服务端统一的“未登录 / 登录已过期”错误码 */
+export const UNAUTHORIZED_CODE = 10002
+
+/** 是否正在跳登录页（避免多个并发 401 重复跳转） */
+let redirectingToLogin = false
+
+/** 当前页面路径：用于登录后回跳 */
+function currentPagePath(): string {
+  const pages = getCurrentPages()
+  // uni-app 的页面实例：route 为页面路径，options 为启动参数
+  const current = pages[pages.length - 1] as unknown as
+    | { route?: string; options?: Record<string, string | undefined> }
+    | undefined
+  if (!current?.route) {
+    return ''
+  }
+  const route = current.route.startsWith('/') ? current.route : `/${current.route}`
+  const query = current.options
+    ? Object.entries(current.options)
+        .filter(([, value]) => value !== undefined && value !== '')
+        .map(([key, value]) => `${key}=${encodeURIComponent(String(value))}`)
+        .join('&')
+    : ''
+  return query ? `${route}?${query}` : route
+}
+
+/** 清理本地登录态并跳转登录页 */
+export function handleUnauthorized(): void {
+  clearSession()
+  if (redirectingToLogin) {
+    return
+  }
+  const path = currentPagePath()
+  if (path.startsWith('/pages/login/login')) {
+    return
+  }
+  redirectingToLogin = true
+  const target = `/pages/login/login?redirect=${encodeURIComponent(path)}`
+  uni.reLaunch({ url: target })
+  // reLaunch 是异步的，留出时间再允许下一次跳转
+  setTimeout(() => {
+    redirectingToLogin = false
+  }, 1500)
+}
+
 /** 发起请求并解包统一响应；业务错误抛出 ApiError */
 export function apiFetch<T>(path: string, options: RequestOptions = {}): Promise<T> {
   const token = options.token === undefined ? getToken() : options.token
@@ -92,6 +137,10 @@ export function apiFetch<T>(path: string, options: RequestOptions = {}): Promise
           return
         }
         if (payload.code !== 0) {
+          // 登录态失效：清理本地会话并引导重新登录（带来源页，登录后回跳）
+          if (response.statusCode === 401 || payload.code === 10002) {
+            handleUnauthorized()
+          }
           reject(new ApiError(payload.code, (payload as ApiErr).message))
           return
         }

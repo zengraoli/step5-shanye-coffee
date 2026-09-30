@@ -5,13 +5,15 @@ import { ApiError } from '@/api/client'
 import { useCart } from '@/composables/useCart'
 import { useCurrentStore } from '@/composables/useCurrentStore'
 import { usePromo } from '@/composables/usePromo'
-import { buildCartItem } from '@/utils/cart'
+import { buildCartItem, payableFen as calcPayableFen, promoDiscountFen as calcPromoDiscount } from '@/utils/cart'
 import { formatMoney } from '@/utils/format'
 import { specExtra, specText, type SpecSelection } from '@/utils/specs'
 import TabBar from '@/components/TabBar.vue'
 
 const { currentStore, select } = useCurrentStore()
-const { isPromoProduct, load: loadPromo } = usePromo()
+const { isPromoProduct, load: loadPromo, activity } = usePromo()
+/** 当前活动适用商品 id（第二杯半价） */
+const promoIds = computed(() => activity.value?.productIds ?? [])
 const cart = useCart()
 
 const categories = ref<Category[]>([])
@@ -29,7 +31,9 @@ const sectionTops = ref<{ id: number; top: number }[]>([])
 
 const isOpen = computed(() => currentStore.value?.status === 'open')
 const count = cart.count
-const totalFen = cart.totalFen
+/** 第二杯半价优惠与应付金额（与服务端口径一致，浮条按应付金额展示） */
+const promoDiscountFen = computed(() => calcPromoDiscount(cartItems.value, [...promoIds.value]))
+const payableFen = computed(() => calcPayableFen(cartItems.value, [...promoIds.value]))
 const cartItems = computed(() => cart.items.value)
 
 const grouped = computed(() =>
@@ -49,7 +53,11 @@ const specUnitPrice = computed(() => {
 
 onMounted(async () => {
   try {
-    const [categoryList, productResult] = await Promise.all([fetchCategories(), fetchProducts({ pageSize: 60 })])
+    // 按当前门店取商品：售罄状态按门店隔离，别店售罄不影响本店点单
+    const [categoryList, productResult] = await Promise.all([
+      fetchCategories(),
+      fetchProducts({ pageSize: 60, storeId: currentStore.value?.id }),
+    ])
     categories.value = categoryList
     products.value = productResult.list
     activeCategory.value = categoryList[0]?.id ?? 0
@@ -104,7 +112,14 @@ function measureSections(): void {
   }
 }
 
+/** 程序滚动进行中的时间戳：此时忽略滚动回调，避免旧测量值把高亮改回去 */
+let programmaticScrollAt = 0
+
 const onScroll = (event: CustomEvent<{ scrollTop: number }>) => {
+  // 点击分类后的滚动动画过程中不回填高亮（否则“点周边却高亮轻食”）
+  if (Date.now() - programmaticScrollAt < 600) {
+    return
+  }
   // 尚未测量成功时先补偿测量，本次不更新高亮（避免被重置）
   if (sectionTops.value.length === 0) {
     measureSections()
@@ -123,6 +138,15 @@ const onScroll = (event: CustomEvent<{ scrollTop: number }>) => {
 const pickCategory = (id: number) => {
   activeCategory.value = id
   toView.value = `cat-${id}`
+  programmaticScrollAt = Date.now()
+  // 滚动开始后重新测量分组位置，动画结束再回填一次高亮
+  nextTick(() => {
+    measureSections()
+    setTimeout(() => {
+      measureSections()
+      programmaticScrollAt = 0
+    }, 650)
+  })
 }
 
 const openSpec = (product: Product) => {
@@ -132,6 +156,22 @@ const openSpec = (product: Product) => {
   }
   if (product.soldOut) {
     uni.showToast({ title: `${product.name} 已售罄`, icon: 'none' })
+    return
+  }
+  // 无规格商品（轻食 / 周边）直接加入购物车，不再要求选杯型温度糖度
+  if (product.specs.length === 0) {
+    cart.add(
+      buildCartItem({
+        productId: product.id,
+        productName: product.name,
+        categoryName: product.categoryName,
+        basePrice: product.basePrice,
+        spec: {},
+        specText: '标准装',
+        quantity: 1,
+      }),
+    )
+    uni.showToast({ title: '已加入购物车', icon: 'none' })
     return
   }
   specProduct.value = product
@@ -292,7 +332,10 @@ const goCheckout = () => {
     <view v-if="cartOpen" class="cart-panel">
       <view class="cart-panel__head">
         <text class="cart-panel__title">购物车</text>
-        <text class="cart-panel__clear" @click="cart.clear(); cartOpen = false">清空</text>
+        <view class="cart-panel__actions">
+          <text class="cart-panel__clear" @click="cart.clear(); cartOpen = false">清空</text>
+          <text class="cart-panel__submit" @click="goCheckout">去结算</text>
+        </view>
       </view>
       <scroll-view class="cart-panel__list" scroll-y>
         <view v-for="(item, index) in cartItems" :key="`${item.productId}-${index}`" class="cart-line">
@@ -311,14 +354,16 @@ const goCheckout = () => {
     </view>
 
     <!-- 底部购物车栏 -->
-    <view class="cart-bar">
+    <view class="cart-bar" :class="{ 'is-hidden': cartOpen }">
       <view class="cart-bar__icon" @click="cartOpen = !cartOpen">
         <view class="cart-bar__cup" />
         <view v-if="count > 0" class="cart-bar__badge">{{ count }}</view>
       </view>
       <view class="cart-bar__info" @click="cartOpen = !cartOpen">
-        <text class="cart-bar__total">{{ formatMoney(totalFen) }}</text>
-        <text class="cart-bar__hint">{{ count > 0 ? `已选 ${count} 件` : '购物车是空的' }}</text>
+        <text class="cart-bar__total">{{ formatMoney(payableFen) }}</text>
+        <text class="cart-bar__hint">
+          {{ count > 0 ? (promoDiscountFen > 0 ? `已享第二杯半价 -${formatMoney(promoDiscountFen)}` : `已选 ${count} 件`) : '购物车是空的' }}
+        </text>
       </view>
       <view class="cart-bar__submit" :class="{ 'is-disabled': count === 0 }" @click="goCheckout">
         去结算
@@ -434,7 +479,7 @@ export default {
 .prods {
   flex: 1;
   height: 100%;
-  padding: 0 $space-2 220rpx;
+  padding: 0 $space-2 300rpx;
 }
 
 .prod-group {
@@ -734,6 +779,23 @@ export default {
 }
 
 /* ---------- 购物车 ---------- */
+.cart-panel {
+  max-height: 62vh;
+}
+
+.cart-panel__list {
+  max-height: 44vh !important;
+}
+
+.cart-bar {
+  /* 展开购物车时隐藏浮动条，避免遮挡数量按钮与“去结算” */
+  transition: opacity 0.2s ease;
+}
+
+.cart-bar.is-hidden {
+  opacity: 0;
+  pointer-events: none;
+}
 .cart-mask {
   position: fixed;
   inset: 0;

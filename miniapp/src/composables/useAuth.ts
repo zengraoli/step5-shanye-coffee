@@ -54,6 +54,15 @@ export function useAuth() {
     return sendSmsCode(phone).then((result) => result.code)
   }
 
+  /** 用服务端返回的最新资料刷新本地登录态（如支付后的积分） */
+  const updateProfile = (profile: MemberProfile): void => {
+    const token = getToken()
+    if (!token) {
+      return
+    }
+    setSession(token, profile)
+  }
+
   return {
     state: readonly(state),
     isLoggedIn: () => state.value.profile !== null,
@@ -61,5 +70,6 @@ export function useAuth() {
     logout,
     refresh,
     sendCode,
+    updateProfile,
   }
 }

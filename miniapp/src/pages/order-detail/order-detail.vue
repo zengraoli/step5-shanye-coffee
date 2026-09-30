@@ -59,7 +59,7 @@ onMounted(async () => {
   const current = pages[pages.length - 1] as unknown as { options?: { id?: string } } | undefined
   orderId.value = Number(current?.options?.id ?? 0)
   if (!isLoggedIn()) {
-    uni.reLaunch({ url: '/pages/login/login' })
+    uni.reLaunch({ url: '/pages/login/login?redirect=/pages/order-detail/order-detail' })
     return
   }
   await load()

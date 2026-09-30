@@ -39,10 +39,15 @@ $font-display: 'Songti SC', 'Noto Serif SC', 'SimSun', Georgia, serif;
 $font-body: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Hiragino Sans GB',
   'Microsoft YaHei', sans-serif;
 
+/*
+ * 圆角与间距刻度。
+ * 小程序 rpx 与官网 px 的对应关系：375 宽屏幕下 1rpx = 0.5px，
+ * 因此这里按“官网 px 值 × 2”书写，保证两端视觉大小一致（不出现圆角只有官网一半的问题）。
+ */
 /* 圆角 */
-$radius-sm: 8rpx;
-$radius-md: 14rpx;
-$radius-lg: 22rpx;
+$radius-sm: 16rpx;
+$radius-md: 28rpx;
+$radius-lg: 44rpx;
 $radius-full: 999rpx;
 
 /* 间距 */
@@ -54,4 +59,4 @@ $space-5: 48rpx;
 $space-6: 64rpx;
 $space-7: 96rpx;
 $space-8: 128rpx;
-$space-9: 160rpx;
+$space-9: 192rpx;

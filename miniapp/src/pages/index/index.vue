@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { onPullDownRefresh, onShow } from '@dcloudio/uni-app'
+import { computed, ref } from 'vue'
 import { fetchProducts, fetchStores, type Product, type Store } from '@/api/catalog'
 import { ApiError } from '@/api/client'
 import { useCurrentStore } from '@/composables/useCurrentStore'
@@ -20,7 +21,8 @@ const featured = computed(() =>
 )
 const isOpen = computed(() => currentStore.value?.status === 'open')
 
-onMounted(async () => {
+/** 拉取门店与商品：门店营业时间 / 状态以服务端为准，不用本地缓存覆盖 */
+const loadData = async () => {
   try {
     const [storeList, productResult] = await Promise.all([fetchStores(), fetchProducts({ pageSize: 60 })])
     stores.value = storeList
@@ -28,12 +30,26 @@ onMounted(async () => {
     // 未选择门店时默认第一家营业中的门店
     if (!currentStore.value && storeList.length > 0) {
       select(storeList.find((store) => store.status === 'open') ?? storeList[0]!)
+    } else if (currentStore.value) {
+      // 已选过门店：用服务端最新状态刷新缓存，避免后台改了营业时间首页还显示旧值
+      const latest = storeList.find((store) => store.id === currentStore.value?.id)
+      if (latest) {
+        select(latest)
+      }
     }
   } catch (err) {
     error.value = err instanceof ApiError ? err.message : '加载失败，请稍后重试'
   } finally {
     loading.value = false
   }
+}
+
+/** 首次进入 */
+loadData()
+
+// 回到首页（含后台切前台、从其它页面返回）时刷新门店营业状态
+onShow(() => {
+  void loadData()
 })
 
 const chooseStore = (store: Store) => {
@@ -42,8 +58,14 @@ const chooseStore = (store: Store) => {
 }
 
 const go = (url: string) => {
-  uni.reLaunch({ url })
+  uni.navigateTo({ url })
 }
+
+/** 下拉刷新：重新拉取门店营业状态 */
+onPullDownRefresh(async () => {
+  await loadData()
+  uni.stopPullDownRefresh()
+})
 
 const goOrder = () => {
   if (!isOpen.value) {
