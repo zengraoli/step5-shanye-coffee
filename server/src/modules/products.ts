@@ -1,9 +1,11 @@
 import type { FastifyInstance } from 'fastify'
+import type { Db } from '../db/index.js'
 import { fail } from '../lib/errors.js'
 import { sendOk } from '../lib/response.js'
 import { SPEC_GROUPS } from '../lib/specs.js'
 import { adminGuard, adminOnly } from '../lib/guards.js'
 import { readPagination } from '../lib/pagination.js'
+import { isSoldOutAtStore, setStoreSoldOut, soldOutStoreIds } from './store-status.js'
 
 interface ProductRow {
   id: number
@@ -24,7 +26,13 @@ interface CategoryRow {
   sort: number
 }
 
-function serializeProduct(product: ProductRow, categoryName: string) {
+function serializeProduct(
+  product: ProductRow & { store_sold_out?: number },
+  categoryName: string,
+  db?: Db,
+) {
+  const globalSoldOut = product.sold_out === 1
+  const storeSoldOut = product.store_sold_out === 1
   return {
     id: product.id,
     categoryId: product.category_id,
@@ -35,10 +43,29 @@ function serializeProduct(product: ProductRow, categoryName: string) {
     image: product.image,
     basePrice: product.base_price,
     onSale: product.on_sale === 1,
-    soldOut: product.sold_out === 1,
+    /** 是否售罄：未指定门店时为全局状态，指定门店时含该门店的单独标记 */
+    soldOut: globalSoldOut || storeSoldOut,
+    /** 被单独标记售罄的门店 id 列表 */
+    soldOutStoreIds: db ? soldOutStoreIds(db, product.id) : [],
     sort: product.sort,
     specs: SPEC_GROUPS,
   }
+}
+
+/** 读取门店筛选参数：'all' / 空视为不限，非法值报 400 */
+function readStoreFilter(db: Db, value: unknown): number | null {
+  if (value === undefined || value === null || value === '' || value === 'all') {
+    return null
+  }
+  const storeId = Number(value)
+  if (!Number.isInteger(storeId) || storeId <= 0) {
+    fail('BAD_REQUEST', '门店 id 不合法')
+  }
+  const store = db.prepare('SELECT id FROM stores WHERE id = ?').get(storeId)
+  if (!store) {
+    fail('STORE_NOT_FOUND', '门店不存在')
+  }
+  return storeId
 }
 
 /** 商品公开接口 + 后台商品管理 */
@@ -66,11 +93,12 @@ export async function productRoutes(app: FastifyInstance): Promise<void> {
     )
   })
 
-  app.get<{ Querystring: { category_id?: string; keyword?: string; page?: string; page_size?: string } }>(
+  app.get<{ Querystring: { category_id?: string; keyword?: string; page?: string; page_size?: string; store_id?: string } }>(
     '/api/v1/products',
-    { schema: { tags: ['products'], summary: '商品列表（仅上架商品，可分页筛选）' } },
+    { schema: { tags: ['products'], summary: '商品列表（仅上架商品，可分页筛选，可按门店返回售罄）' } },
     async (request, reply) => {
       const { category_id: categoryId, keyword } = request.query
+      const storeId = readStoreFilter(db, request.query.store_id)
       const { page, pageSize, offset } = readPagination(request.query, { defaultSize: 20, maxSize: 50 })
 
       const conditions: string[] = ['p.on_sale = 1']
@@ -90,16 +118,22 @@ export async function productRoutes(app: FastifyInstance): Promise<void> {
       const where = `WHERE ${conditions.join(' AND ')}`
 
       const totalRow = db.prepare(`SELECT COUNT(*) AS n FROM products p ${where}`).get(...params) as unknown as { n: number }
+      const soldOutCase = storeId !== null
+        ? `,
+           (SELECT sold_out FROM product_store_status pss WHERE pss.product_id = p.id AND pss.store_id = ${storeId}) AS store_sold_out`
+        : ''
       const rows = db
         .prepare(
-          `SELECT p.*, c.name AS category_name FROM products p
+          `SELECT p.*, c.name AS category_name${soldOutCase}
+           FROM products p
            LEFT JOIN categories c ON c.id = p.category_id
            ${where} ORDER BY p.sort, p.id LIMIT ? OFFSET ?`,
         )
-        .all(...params, pageSize, offset) as unknown as (ProductRow & { category_name: string | null })[]
+        .all(...params, pageSize, offset) as unknown as (ProductRow & { category_name: string | null; store_sold_out?: number })[]
 
       return sendOk(reply, {
-        list: rows.map((row) => serializeProduct(row, row.category_name ?? '')),
+        list: rows.map((row) => serializeProduct(row, row.category_name ?? '', db)),
+        storeId,
         total: totalRow.n,
         page,
         pageSize,
@@ -107,24 +141,28 @@ export async function productRoutes(app: FastifyInstance): Promise<void> {
     },
   )
 
-  app.get<{ Params: { id: string } }>('/api/v1/products/:id', { schema: { tags: ['products'], summary: '商品详情（含规格）' } }, async (request, reply) => {
+  app.get<{ Params: { id: string }; Querystring: { store_id?: string } }>('/api/v1/products/:id', { schema: { tags: ['products'], summary: '商品详情（含规格，可按门店返回售罄）' } }, async (request, reply) => {
     const id = Number(request.params.id)
     if (!Number.isInteger(id) || id <= 0) {
       fail('BAD_REQUEST', '商品 id 不合法')
     }
+    const storeId = readStoreFilter(db, request.query.store_id)
+    const soldOutCase = storeId !== null
+      ? `, (SELECT sold_out FROM product_store_status pss WHERE pss.product_id = p.id AND pss.store_id = ${storeId}) AS store_sold_out`
+      : ''
     const product = db
       .prepare(
-        `SELECT p.*, c.name AS category_name FROM products p
+        `SELECT p.*, c.name AS category_name${soldOutCase} FROM products p
          LEFT JOIN categories c ON c.id = p.category_id WHERE p.id = ?`,
       )
-      .get(id) as unknown as (ProductRow & { category_name: string | null }) | undefined
+      .get(id) as unknown as (ProductRow & { category_name: string | null; store_sold_out?: number }) | undefined
     if (!product) {
       fail('PRODUCT_NOT_FOUND')
     }
     if (product.on_sale !== 1) {
       fail('PRODUCT_OFF_SALE')
     }
-    return sendOk(reply, serializeProduct(product, product.category_name ?? ''))
+    return sendOk(reply, serializeProduct(product, product.category_name ?? '', db))
   })
 
   // ---------- 后台 ----------
@@ -167,8 +205,23 @@ export async function productRoutes(app: FastifyInstance): Promise<void> {
            LEFT JOIN categories c ON c.id = p.category_id ${where} ORDER BY p.sort, p.id LIMIT ? OFFSET ?`,
         )
         .all(...params, pageSize, offset) as unknown as (ProductRow & { category_name: string | null })[]
+      const storeSoldOut = db
+        .prepare('SELECT product_id, store_id FROM product_store_status WHERE sold_out = 1')
+        .all() as unknown as { product_id: number; store_id: number }[]
+      const storeSoldOutMap = new Map<number, number[]>()
+      for (const row of storeSoldOut) {
+        const list = storeSoldOutMap.get(row.product_id)
+        if (list) {
+          list.push(row.store_id)
+        } else {
+          storeSoldOutMap.set(row.product_id, [row.store_id])
+        }
+      }
       return sendOk(reply, {
-        list: rows.map((row) => serializeProduct(row, row.category_name ?? '')),
+        list: rows.map((row) => ({
+          ...serializeProduct(row, row.category_name ?? '', db),
+          soldOutStoreIds: (storeSoldOutMap.get(row.id) ?? []).sort((a, b) => a - b),
+        })),
         total: totalRow.n,
         page,
         pageSize,
@@ -302,10 +355,10 @@ export async function productRoutes(app: FastifyInstance): Promise<void> {
       )
     })
 
-    // 上下架 / 售罄：管理员可改全部，店员仅可改售罄
-    instance.patch<{ Params: { id: string }; Body: { onSale?: unknown; soldOut?: unknown } }>(
+    // 上下架 / 售罄：管理员可改全部，店员仅可改本店售罄
+    instance.patch<{ Params: { id: string }; Body: { onSale?: unknown; soldOut?: unknown; storeId?: unknown } }>(
       '/api/v1/admin/products/:id/status',
-      { schema: { tags: ['admin', 'products'], summary: '上下架 / 售罄（店员仅可改售罄）', security: [{ adminBearer: [] }] } },
+      { schema: { tags: ['admin', 'products'], summary: '上下架 / 售罄（可传 storeId 只改某门店）', security: [{ adminBearer: [] }] } },
       async (request, reply) => {
         const id = Number(request.params.id)
         if (!Number.isInteger(id) || id <= 0) {
@@ -316,13 +369,16 @@ export async function productRoutes(app: FastifyInstance): Promise<void> {
           fail('PRODUCT_NOT_FOUND')
         }
         const admin = request.admin!
-        const { onSale, soldOut } = request.body ?? {}
+        const { onSale, soldOut, storeId } = request.body ?? {}
         if (onSale !== undefined) {
           if (admin.role !== 'admin') {
             fail('FORBIDDEN', '只有管理员可以上下架商品')
           }
           if (typeof onSale !== 'boolean') {
             fail('BAD_REQUEST', 'onSale 必须为布尔值')
+          }
+          if (storeId !== undefined && storeId !== null && storeId !== '') {
+            fail('BAD_REQUEST', '上下架不支持按门店设置')
           }
         }
         if (soldOut !== undefined && typeof soldOut !== 'boolean') {
@@ -331,14 +387,37 @@ export async function productRoutes(app: FastifyInstance): Promise<void> {
         if (onSale === undefined && soldOut === undefined) {
           fail('BAD_REQUEST', '没有需要更新的字段')
         }
+        let targetStoreId: number | null = null
+        if (storeId !== undefined && storeId !== null && storeId !== '') {
+          targetStoreId = readStoreFilter(db, storeId)
+        }
+        // 店员只能操作自己绑定的门店
+        if (admin.role === 'staff') {
+          if (admin.storeId === null) {
+            fail('FORBIDDEN', '店员账号未绑定门店')
+          }
+          targetStoreId = admin.storeId
+        }
+        if (admin.role === 'staff' && onSale !== undefined) {
+          fail('FORBIDDEN', '只有管理员可以上下架商品')
+        }
         if (onSale !== undefined) {
           db.prepare('UPDATE products SET on_sale = ? WHERE id = ?').run(onSale ? 1 : 0, id)
         }
         if (soldOut !== undefined) {
-          db.prepare('UPDATE products SET sold_out = ? WHERE id = ?').run(soldOut ? 1 : 0, id)
+          if (targetStoreId !== null) {
+            setStoreSoldOut(db, id, targetStoreId, soldOut)
+          } else {
+            db.prepare('UPDATE products SET sold_out = ? WHERE id = ?').run(soldOut ? 1 : 0, id)
+          }
         }
         const updated = db.prepare('SELECT * FROM products WHERE id = ?').get(id) as unknown as ProductRow
-        return sendOk(reply, serializeProduct(updated, ''))
+        // 指定门店时，返回该门店口径的售罄状态，便于前端即时回显
+        const payload = serializeProduct(updated, '', db)
+        return sendOk(
+          reply,
+          targetStoreId !== null ? { ...payload, soldOut: soldOut === true || payload.soldOut } : payload,
+        )
       },
     )
   })

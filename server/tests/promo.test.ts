@@ -48,13 +48,30 @@ test('第二杯半价：非适用商品不优惠，多商品分别计数', () =>
   assert.equal(secondHalfDiscountFen(lines, [1]), 1500)
 })
 
-test('第二杯半价：同一商品多规格按行顺序累计', () => {
-  const lines = [
+test('第二杯半价：同一商品多规格时半价较低单价那杯，与加购顺序无关', () => {
+  const mediumFirst = [
     { productId: 1, unitPrice: 3200, quantity: 1 },
     { productId: 1, unitPrice: 3500, quantity: 1 },
   ]
-  // 第 2 杯（大杯 3500）半价 1750
-  assert.equal(secondHalfDiscountFen(lines, [1]), 1750)
+  const largeFirst = [
+    { productId: 1, unitPrice: 3500, quantity: 1 },
+    { productId: 1, unitPrice: 3200, quantity: 1 },
+  ]
+  // 中杯 3200 / 大杯 3500：半价的是中杯 1600
+  assert.equal(secondHalfDiscountFen(mediumFirst, [1]), 1600)
+  // 顺序颠倒结果一致
+  assert.equal(secondHalfDiscountFen(largeFirst, [1]), 1600)
+  // 3 杯（2 大 1 中）：第 2 杯半价，与顺序无关仍是 1750
+  const mixed = [
+    { productId: 1, unitPrice: 3500, quantity: 2 },
+    { productId: 1, unitPrice: 3200, quantity: 1 },
+  ]
+  assert.equal(secondHalfDiscountFen(mixed, [1]), 1750)
+  const mixedReversed = [
+    { productId: 1, unitPrice: 3200, quantity: 1 },
+    { productId: 1, unitPrice: 3500, quantity: 2 },
+  ]
+  assert.equal(secondHalfDiscountFen(mixedReversed, [1]), 1750)
 })
 
 test('活动生效判断：状态、时间边界与适用商品', () => {

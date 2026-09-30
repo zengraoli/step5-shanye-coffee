@@ -42,8 +42,10 @@ export function isPromoActive(activity: PromoActivity | null | undefined, now: D
 
 /**
  * 第二杯半价优惠金额（分）。
- * 规则：同一订单中同一适用商品的第 2、4、6… 杯按半价计算，
- * 半价单价为 `Math.floor(unitPrice / 2)`；同一商品多规格按行顺序累计计数。
+ * 规则：同一订单中同一适用商品，第 2、4、6… 杯按半价计；
+ * 半价单价为 `Math.floor(unitPrice / 2)`。
+ * 同一商品多种规格时，先把该商品的所有杯按单价从高到低排序再计数，
+ * 保证“半价的是更便宜的那杯”，优惠金额与加购顺序无关。
  */
 export function secondHalfDiscountFen(lines: PromoLine[], productIds: Set<number> | number[]): number {
   const idSet = productIds instanceof Set ? productIds : new Set(productIds)
@@ -65,16 +67,20 @@ export function secondHalfDiscountFen(lines: PromoLine[], productIds: Set<number
   }
   let discount = 0
   for (const list of byProduct.values()) {
-    let seen = 0
+    // 展开成单杯，按单价从高到低排序：第 1、3、5… 杯原价，第 2、4、6… 杯半价
+    const units: number[] = []
     for (const line of list) {
       for (let i = 0; i < line.quantity; i += 1) {
-        seen += 1
-        // 第 2、4、6… 杯半价
-        if (seen % 2 === 0) {
-          discount += Math.floor(line.unitPrice / 2)
-        }
+        units.push(line.unitPrice)
       }
     }
+    units.sort((a, b) => b - a)
+    units.forEach((price, index) => {
+      // index 从 0 开始，偶数位是“第 1、3… 杯”
+      if (index % 2 === 1) {
+        discount += Math.floor(price / 2)
+      }
+    })
   }
   return discount
 }

@@ -2,7 +2,7 @@ import type { FastifyInstance } from 'fastify'
 import { fail } from '../lib/errors.js'
 import { sendOk } from '../lib/response.js'
 import { adminGuard, adminOnly } from '../lib/guards.js'
-import { isWithinBusinessHours } from '../lib/time.js'
+import { isStoreOpen } from '../lib/time.js'
 
 interface StoreRow {
   id: number
@@ -11,10 +11,11 @@ interface StoreRow {
   phone: string
   open_time: string
   close_time: string
+  manual_closed: number
 }
 
 function serializeStore(store: StoreRow) {
-  const open = isWithinBusinessHours(store.open_time, store.close_time)
+  const open = isStoreOpen(store)
   return {
     id: store.id,
     name: store.name,
@@ -22,6 +23,7 @@ function serializeStore(store: StoreRow) {
     phone: store.phone,
     openTime: store.open_time,
     closeTime: store.close_time,
+    manualClosed: store.manual_closed === 1,
     status: open ? 'open' : 'rest',
     statusText: open ? '营业中' : '休息中',
   }
@@ -48,6 +50,8 @@ export async function adminStoreRoutes(app: FastifyInstance): Promise<void> {
       phone?: unknown
       openTime?: unknown
       closeTime?: unknown
+      /** 手动休息开关：true 表示临时闭店，无需改营业时间 */
+      manualClosed?: unknown
     }
     instance.put<{ Params: { id: string }; Body: StorePayload }>('/api/v1/admin/stores/:id', { schema: { tags: ['admin', 'stores'], summary: '编辑门店信息与营业时间', security: [{ adminBearer: [] }] } }, async (request, reply) => {
       const id = Number(request.params.id)
@@ -101,6 +105,13 @@ export async function adminStoreRoutes(app: FastifyInstance): Promise<void> {
         }
         updates.push('close_time = ?')
         params.push(closeTime)
+      }
+      if (payload.manualClosed !== undefined) {
+        if (typeof payload.manualClosed !== 'boolean') {
+          fail('BAD_REQUEST', 'manualClosed 必须为布尔值')
+        }
+        updates.push('manual_closed = ?')
+        params.push(payload.manualClosed ? 1 : 0)
       }
       if (updates.length === 0) {
         fail('BAD_REQUEST', '没有需要更新的字段')

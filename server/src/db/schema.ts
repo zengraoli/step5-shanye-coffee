@@ -17,6 +17,7 @@ export const MIGRATIONS: string[] = [
     phone TEXT NOT NULL,
     open_time TEXT NOT NULL,
     close_time TEXT NOT NULL,
+    manual_closed INTEGER NOT NULL DEFAULT 0,
     created_at TEXT NOT NULL
   )`,
   `CREATE TABLE IF NOT EXISTS categories (
@@ -36,6 +37,14 @@ export const MIGRATIONS: string[] = [
     sold_out INTEGER NOT NULL DEFAULT 0,
     sort INTEGER NOT NULL DEFAULT 0,
     created_at TEXT NOT NULL
+  )`,
+  /* ---------- 门店手动状态与门店级售罄 ---------- */
+  `CREATE TABLE IF NOT EXISTS product_store_status (
+    product_id INTEGER NOT NULL REFERENCES products(id),
+    store_id INTEGER NOT NULL REFERENCES stores(id),
+    sold_out INTEGER NOT NULL DEFAULT 1,
+    updated_at TEXT NOT NULL,
+    PRIMARY KEY (product_id, store_id)
   )`,
   `CREATE TABLE IF NOT EXISTS coupons (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -158,6 +167,7 @@ export function migrateSchema(db: {
   if (!columns.some((column) => column.name === 'promo_discount_fen')) {
     db.exec('ALTER TABLE orders ADD COLUMN promo_discount_fen INTEGER NOT NULL DEFAULT 0')
   }
+  addStoreManualClosed(db)
   addMemberCouponSnapshotColumns(db)
 }
 
@@ -171,6 +181,14 @@ function addColumn(db: { exec: (sql: string) => unknown }, table: string, column
  * 会员券快照字段：领取时把券模板的名称与优惠条件复制到会员券上，
  * 之后后台编辑券模板不会影响已领取的券（弹窗承诺“对新领取的券生效”）。
  */
+function addStoreManualClosed(db: {
+  prepare: (sql: string) => { all: () => unknown[] }
+  exec: (sql: string) => unknown
+}): void {
+  const columns = db.prepare('PRAGMA table_info(stores)').all() as { name: string }[]
+  addColumn(db, 'stores', 'manual_closed', 'INTEGER NOT NULL DEFAULT 0', columns)
+}
+
 function addMemberCouponSnapshotColumns(db: {
   prepare: (sql: string) => { all: () => unknown[] }
   exec: (sql: string) => unknown

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { createTestApp, loginAdmin } from './helpers.js'
+import { createTestApp, forceStoreOpen, loginAdmin, loginMember } from './helpers.js'
 import { maskPhone } from '../src/lib/phone.js'
 
 test('门店列表返回 3 家门店与营业状态', async () => {
@@ -131,12 +131,12 @@ test('下架商品在用户端列表消失、详情报错', async () => {
 
 test('售罄商品在用户端标记 soldOut', async () => {
   const { app } = await createTestApp()
-  const staffToken = await loginAdmin(app, 'staff')
+  const adminToken = await loginAdmin(app, 'admin')
   try {
     const patch = await app.inject({
       method: 'PATCH',
       url: '/api/v1/admin/products/2/status',
-      headers: { authorization: `Bearer ${staffToken}` },
+      headers: { authorization: `Bearer ${adminToken}` },
       payload: { soldOut: true },
     })
     assert.equal(patch.statusCode, 200)
@@ -145,6 +145,53 @@ test('售罄商品在用户端标记 soldOut', async () => {
     const detail = await app.inject({ method: 'GET', url: '/api/v1/products/2' })
     assert.equal(detail.statusCode, 200)
     assert.equal(detail.json().data.soldOut, true)
+
+  } finally {
+    await app.close()
+  }
+})
+
+test('店员标记售罄只影响本门店，其他门店不受影响', async () => {
+  const { app, db } = await createTestApp()
+  const staffToken = await loginAdmin(app, 'staff')
+  try {
+    const patch = await app.inject({
+      method: 'PATCH',
+      url: '/api/v1/admin/products/2/status',
+      headers: { authorization: `Bearer ${staffToken}` },
+      payload: { soldOut: true, storeId: 1 },
+    })
+    assert.equal(patch.statusCode, 200)
+    assert.equal(patch.json().data.soldOut, true)
+    assert.deepEqual(patch.json().data.soldOutStoreIds, [1])
+
+    const own = await app.inject({ method: 'GET', url: '/api/v1/products/2?store_id=1' })
+    assert.equal(own.json().data.soldOut, true)
+    const other = await app.inject({ method: 'GET', url: '/api/v1/products/2?store_id=2' })
+    assert.equal(other.json().data.soldOut, false)
+    const anyStore = await app.inject({ method: 'GET', url: '/api/v1/products/2' })
+    assert.equal(anyStore.json().data.soldOut, false)
+
+    // 2 号店可以正常下单，1 号店被拒绝
+    forceStoreOpen(db, 1)
+    forceStoreOpen(db, 2)
+    const token = await loginMember(app, '13800000001')
+    const cart = [{ productId: 2, spec: { cup: 'medium', temp: 'ice', sugar: 'less' }, quantity: 1 }]
+    const ok = await app.inject({
+      method: 'POST',
+      url: '/api/v1/orders',
+      headers: { authorization: `Bearer ${token}` },
+      payload: { storeId: 2, orderType: 'takeout', items: cart },
+    })
+    assert.equal(ok.statusCode, 201, ok.body)
+    const blocked = await app.inject({
+      method: 'POST',
+      url: '/api/v1/orders',
+      headers: { authorization: `Bearer ${token}` },
+      payload: { storeId: 1, orderType: 'takeout', items: cart },
+    })
+    assert.equal(blocked.statusCode, 400, blocked.body)
+    assert.match(blocked.json().message, /已售罄/)
 
     // 店员不能上下架
     const forbidden = await app.inject({
@@ -155,6 +202,54 @@ test('售罄商品在用户端标记 soldOut', async () => {
     })
     assert.equal(forbidden.statusCode, 403)
     assert.equal(forbidden.json().code, 10003)
+  } finally {
+    await app.close()
+  }
+})
+
+test('门店可以手动休息，休息中不能下单', async () => {
+  const { app, db } = await createTestApp()
+  const adminToken = await loginAdmin(app, 'admin')
+  const token = await loginMember(app, '13800000001')
+  try {
+    const closed = await app.inject({
+      method: 'PUT',
+      url: '/api/v1/admin/stores/1',
+      headers: { authorization: `Bearer ${adminToken}` },
+      payload: { manualClosed: true },
+    })
+    assert.equal(closed.statusCode, 200, closed.body)
+    assert.equal(closed.json().data.status, 'rest')
+    assert.equal(closed.json().data.manualClosed, true)
+
+    const store = await app.inject({ method: 'GET', url: '/api/v1/stores/1' })
+    assert.equal(store.json().data.statusText, '休息中')
+
+    const cart = [{ productId: 1, spec: { cup: 'medium', temp: 'ice', sugar: 'less' }, quantity: 1 }]
+    const blocked = await app.inject({
+      method: 'POST',
+      url: '/api/v1/orders',
+      headers: { authorization: `Bearer ${token}` },
+      payload: { storeId: 1, orderType: 'takeout', items: cart },
+    })
+    assert.equal(blocked.statusCode, 400, blocked.body)
+    assert.equal(blocked.json().code, 20002)
+
+    // 恢复营业后可下单
+    await app.inject({
+      method: 'PUT',
+      url: '/api/v1/admin/stores/1',
+      headers: { authorization: `Bearer ${adminToken}` },
+      payload: { manualClosed: false },
+    })
+    forceStoreOpen(db, 1)
+    const ok = await app.inject({
+      method: 'POST',
+      url: '/api/v1/orders',
+      headers: { authorization: `Bearer ${token}` },
+      payload: { storeId: 1, orderType: 'takeout', items: cart },
+    })
+    assert.equal(ok.statusCode, 201, ok.body)
   } finally {
     await app.close()
   }

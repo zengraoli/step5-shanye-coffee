@@ -9,7 +9,7 @@ import {
   type CouponLike,
   type CouponType,
 } from '../lib/coupon.js'
-import { isWithinBusinessHours } from '../lib/time.js'
+import { isStoreOpen } from '../lib/time.js'
 import { adminGuard, adminOnly, memberGuard } from '../lib/guards.js'
 import { promoDiscountFor } from './promo.js'
 import { withTransaction } from '../db/tx.js'
@@ -219,18 +219,18 @@ export async function couponRoutes(app: FastifyInstance): Promise<void> {
         fail('BAD_REQUEST', '请选择门店')
       }
       const store = db
-        .prepare('SELECT id, name, open_time, close_time FROM stores WHERE id = ?')
-        .get(storeId) as unknown as { id: number; name: string; open_time: string; close_time: string } | undefined
+        .prepare('SELECT id, name, open_time, close_time, manual_closed FROM stores WHERE id = ?')
+        .get(storeId) as unknown as { id: number; name: string; open_time: string; close_time: string; manual_closed: number } | undefined
       if (!store) {
         fail('STORE_NOT_FOUND')
       }
       if (body.orderType !== 'takeout' && body.orderType !== 'dine_in') {
         fail('BAD_REQUEST', '请选择下单方式（自提 / 堂食）')
       }
-      if (!isWithinBusinessHours(store.open_time, store.close_time)) {
+      if (!isStoreOpen(store)) {
         fail('STORE_CLOSED')
       }
-      const { lines, totalFen } = priceCart(db, body.items as CartItemInput[])
+      const { lines, totalFen } = priceCart(db, body.items as CartItemInput[], storeId)
       const now = new Date()
 
       // 第二杯半价：先算活动价，优惠券按活动后金额计算

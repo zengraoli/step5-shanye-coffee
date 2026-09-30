@@ -1,7 +1,7 @@
 import type { FastifyInstance } from 'fastify'
 import { fail } from '../lib/errors.js'
 import { sendOk } from '../lib/response.js'
-import { isWithinBusinessHours } from '../lib/time.js'
+import { isStoreOpen } from '../lib/time.js'
 
 interface StoreRow {
   id: number
@@ -10,10 +10,11 @@ interface StoreRow {
   phone: string
   open_time: string
   close_time: string
+  manual_closed: number
 }
 
 function serializeStore(store: StoreRow) {
-  const open = isWithinBusinessHours(store.open_time, store.close_time)
+  const open = isStoreOpen(store)
   return {
     id: store.id,
     name: store.name,
@@ -21,6 +22,7 @@ function serializeStore(store: StoreRow) {
     phone: store.phone,
     openTime: store.open_time,
     closeTime: store.close_time,
+    manualClosed: store.manual_closed === 1,
     status: open ? 'open' : 'rest',
     statusText: open ? '营业中' : '休息中',
   }

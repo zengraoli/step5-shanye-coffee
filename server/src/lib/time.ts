@@ -56,3 +56,18 @@ export function toBeijingDisplay(iso: string): string {
   const shifted = new Date(date.getTime() + BEIJING_OFFSET_MS)
   return shifted.toISOString().replace('T', ' ').slice(0, 16)
 }
+
+/** 门店营业状态输入：营业时间 + 后台手动“休息中”开关 */
+export interface StoreOpenState {
+  open_time: string
+  close_time: string
+  manual_closed?: number
+}
+
+/** 门店当前是否可下单：未手动休息且在营业时间内 */
+export function isStoreOpen(store: StoreOpenState): boolean {
+  if (store.manual_closed === 1) {
+    return false
+  }
+  return isWithinBusinessHours(store.open_time, store.close_time)
+}

@@ -1,6 +1,7 @@
 import type { Db } from '../db/index.js'
 import { fail } from '../lib/errors.js'
 import { isValidSpec, specExtra, specLabel } from '../lib/specs.js'
+import { isSoldOutAtStore } from './store-status.js'
 
 export interface CartItemInput {
   productId: number
@@ -24,9 +25,10 @@ export interface PriceResult {
 }
 
 /**
- * 购物车计价：校验商品在售、未售罄、规格合法，计算每行小计与总原价（分）。
+ * 购物车计价：校验商品在售、未售罄（按门店）、规格合法，计算每行小计与总原价（分）。
+ * storeId 为 null 时只校验全局售罄（用于报价前的粗检）。
  */
-export function priceCart(db: Db, items: CartItemInput[]): PriceResult {
+export function priceCart(db: Db, items: CartItemInput[], storeId: number | null = null): PriceResult {
   if (!Array.isArray(items) || items.length === 0) {
     fail('ORDER_EMPTY')
   }
@@ -56,8 +58,11 @@ export function priceCart(db: Db, items: CartItemInput[]): PriceResult {
     if (product.on_sale !== 1) {
       fail('PRODUCT_OFF_SALE', `${product.name} 已下架`)
     }
-    if (product.sold_out === 1) {
-      fail('PRODUCT_SOLD_OUT', `${product.name} 已售罄`)
+    if (isSoldOutAtStore(db, productId, storeId ?? -1)) {
+      fail(
+        'PRODUCT_SOLD_OUT',
+        storeId !== null ? `${product.name} 在所选门店已售罄` : `${product.name} 已售罄`,
+      )
     }
     const unitPrice = product.base_price + specExtra(spec)
     const amount = unitPrice * quantity
