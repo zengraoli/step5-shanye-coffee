@@ -166,7 +166,7 @@ export function DashboardPage() {
         </CardContent>
       </Card>
 
-      <div className="grid gap-4 xl:grid-cols-2">
+      <div className="grid gap-4 2xl:grid-cols-2">
         {/* 热销 Top10 */}
         <Card>
           <CardHeader>
