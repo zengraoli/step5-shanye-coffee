@@ -3,6 +3,7 @@ import { fail } from '../lib/errors.js'
 import { sendOk } from '../lib/response.js'
 import { SPEC_GROUPS } from '../lib/specs.js'
 import { adminGuard, adminOnly } from '../lib/guards.js'
+import { readPagination } from '../lib/pagination.js'
 
 interface ProductRow {
   id: number
@@ -40,11 +41,6 @@ function serializeProduct(product: ProductRow, categoryName: string) {
   }
 }
 
-function toInt(value: unknown, fallback: number): number {
-  const num = Number(value)
-  return Number.isInteger(num) ? num : fallback
-}
-
 /** 商品公开接口 + 后台商品管理 */
 export async function productRoutes(app: FastifyInstance): Promise<void> {
   const db = app.db
@@ -75,8 +71,7 @@ export async function productRoutes(app: FastifyInstance): Promise<void> {
     { schema: { tags: ['products'], summary: '商品列表（仅上架商品，可分页筛选）' } },
     async (request, reply) => {
       const { category_id: categoryId, keyword } = request.query
-      const page = Math.max(1, toInt(request.query.page, 1))
-      const pageSize = Math.min(50, Math.max(1, toInt(request.query.page_size, 20)))
+      const { page, pageSize, offset } = readPagination(request.query, { defaultSize: 20, maxSize: 50 })
 
       const conditions: string[] = ['p.on_sale = 1']
       const params: (string | number)[] = []
@@ -101,7 +96,7 @@ export async function productRoutes(app: FastifyInstance): Promise<void> {
            LEFT JOIN categories c ON c.id = p.category_id
            ${where} ORDER BY p.sort, p.id LIMIT ? OFFSET ?`,
         )
-        .all(...params, pageSize, (page - 1) * pageSize) as unknown as (ProductRow & { category_name: string | null })[]
+        .all(...params, pageSize, offset) as unknown as (ProductRow & { category_name: string | null })[]
 
       return sendOk(reply, {
         list: rows.map((row) => serializeProduct(row, row.category_name ?? '')),
@@ -162,8 +157,7 @@ export async function productRoutes(app: FastifyInstance): Promise<void> {
         params.push(Number(query.sold_out))
       }
       const where = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : ''
-      const page = Math.max(1, toInt(query.page, 1))
-      const pageSize = Math.min(100, Math.max(1, toInt(query.page_size, 20)))
+      const { page, pageSize, offset } = readPagination(query, { defaultSize: 20, maxSize: 100 })
       const totalRow = db
         .prepare(`SELECT COUNT(*) AS n FROM products p ${where}`)
         .get(...params) as unknown as { n: number }
@@ -172,7 +166,7 @@ export async function productRoutes(app: FastifyInstance): Promise<void> {
           `SELECT p.*, c.name AS category_name FROM products p
            LEFT JOIN categories c ON c.id = p.category_id ${where} ORDER BY p.sort, p.id LIMIT ? OFFSET ?`,
         )
-        .all(...params, pageSize, (page - 1) * pageSize) as unknown as (ProductRow & { category_name: string | null })[]
+        .all(...params, pageSize, offset) as unknown as (ProductRow & { category_name: string | null })[]
       return sendOk(reply, {
         list: rows.map((row) => serializeProduct(row, row.category_name ?? '')),
         total: totalRow.n,
@@ -200,9 +194,15 @@ export async function productRoutes(app: FastifyInstance): Promise<void> {
         if (payload.name.trim().length > 30) {
           fail('BAD_REQUEST', '商品名称不能超过 30 个字')
         }
+        if (payload.name.trim().length < 1) {
+          fail('BAD_REQUEST', '请填写商品名称')
+        }
         const basePrice = Number(payload.basePrice)
         if (!Number.isInteger(basePrice) || basePrice <= 0) {
           fail('BAD_REQUEST', '商品价格必须为大于 0 的整数分')
+        }
+        if (basePrice > 100000000) {
+          fail('BAD_REQUEST', '商品价格不能超过 100 万元')
         }
         const info = db
           .prepare(
@@ -243,12 +243,19 @@ export async function productRoutes(app: FastifyInstance): Promise<void> {
             if (!Number.isInteger(categoryId) || categoryId <= 0) {
               fail('BAD_REQUEST', '请选择商品分类')
             }
+            const category = db.prepare('SELECT id FROM categories WHERE id = ?').get(categoryId)
+            if (!category) {
+              fail('BAD_REQUEST', '商品分类不存在')
+            }
             updates.push('category_id = ?')
             params.push(categoryId)
           }
           if (payload.name !== undefined) {
             if (typeof payload.name !== 'string' || payload.name.trim().length === 0) {
               fail('BAD_REQUEST', '请填写商品名称')
+            }
+            if (payload.name.trim().length > 30) {
+              fail('BAD_REQUEST', '商品名称不能超过 30 个字')
             }
             updates.push('name = ?')
             params.push(payload.name.trim())
@@ -265,6 +272,9 @@ export async function productRoutes(app: FastifyInstance): Promise<void> {
             const basePrice = Number(payload.basePrice)
             if (!Number.isInteger(basePrice) || basePrice <= 0) {
               fail('BAD_REQUEST', '商品价格必须为大于 0 的整数分')
+            }
+            if (basePrice > 100000000) {
+              fail('BAD_REQUEST', '商品价格不能超过 100 万元')
             }
             updates.push('base_price = ?')
             params.push(basePrice)

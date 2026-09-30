@@ -5,6 +5,7 @@ import { maskPhone } from '../lib/phone.js'
 import { adminGuard, adminOnly, memberGuard } from '../lib/guards.js'
 import { serializeMember } from './points.js'
 import { isOrderStatus } from '../lib/order-status.js'
+import { readPagination } from '../lib/pagination.js'
 
 interface MemberRow {
   id: number
@@ -83,8 +84,7 @@ export async function memberRoutes(app: FastifyInstance): Promise<void> {
         params.push(query.level)
       }
       const where = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : ''
-      const page = Math.max(1, Number(query.page ?? 1) || 1)
-      const pageSize = Math.min(100, Math.max(1, Number(query.page_size ?? 20) || 20))
+      const { page, pageSize, offset } = readPagination(query, { defaultSize: 20, maxSize: 100 })
       const totalRow = db
         .prepare(`SELECT COUNT(*) AS n FROM members m ${where}`)
         .get(...params) as unknown as { n: number }

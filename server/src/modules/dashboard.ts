@@ -72,14 +72,14 @@ export async function dashboardRoutes(app: FastifyInstance): Promise<void> {
         const rangeStart = new Date(`${days[0] as string}T00:00:00+08:00`).toISOString()
         const today = beijingToday()
 
-        // 近 7 天趋势（按北京时间分桶，仅统计已支付订单，排除取消）
+        // 近 7 天趋势（按北京时间分桶，仅统计已支付订单，不含待支付与取消）
         const trendRows = db
           .prepare(
             `SELECT strftime('%Y-%m-%d', datetime(o.created_at, '+8 hours')) AS d,
                     COUNT(*) AS order_count,
                     COALESCE(SUM(o.pay_fen), 0) AS revenue
              FROM orders o
-             WHERE o.status != 'cancelled' AND o.created_at >= ? ${storeFilter}
+             WHERE o.status IN ('paid', 'making', 'pickable', 'completed') AND o.created_at >= ? ${storeFilter}
              GROUP BY d ORDER BY d`,
           )
           .all(rangeStart, ...storeParams) as unknown as TrendRow[]
@@ -90,21 +90,30 @@ export async function dashboardRoutes(app: FastifyInstance): Promise<void> {
           orderCount: trendMap.get(date)?.order_count ?? 0,
         }))
 
-        // 今日概览
+        // 今日概览（仅已支付订单，与卡片说明“已支付订单（不含取消）”一致）
         const todayRow = db
           .prepare(
             `SELECT COUNT(*) AS order_count, COALESCE(SUM(o.pay_fen), 0) AS revenue
              FROM orders o
-             WHERE o.status != 'cancelled'
+             WHERE o.status IN ('paid', 'making', 'pickable', 'completed')
                AND strftime('%Y-%m-%d', datetime(o.created_at, '+8 hours')) = ? ${storeFilter}`,
           )
           .get(today, ...storeParams) as unknown as { order_count: number; revenue: number }
-        const newMembers = db
-          .prepare(
-            `SELECT COUNT(*) AS n FROM members
-             WHERE strftime('%Y-%m-%d', datetime(created_at, '+8 hours')) = ?`,
-          )
-          .get(today) as unknown as { n: number }
+        // 新增会员：管理员看全平台；店员只看本门店当天首次下单的会员
+        const newMembers = isStaff
+          ? db
+              .prepare(
+                `SELECT COUNT(DISTINCT o.member_id) AS n FROM orders o
+                 WHERE o.store_id = ?
+                   AND strftime('%Y-%m-%d', datetime(o.created_at, '+8 hours')) = ?`,
+              )
+              .get(admin.storeId, today) as unknown as { n: number }
+          : db
+              .prepare(
+                `SELECT COUNT(*) AS n FROM members
+                 WHERE strftime('%Y-%m-%d', datetime(created_at, '+8 hours')) = ?`,
+              )
+              .get(today) as unknown as { n: number }
         const orderCount = todayRow.order_count
         const revenueFen = todayRow.revenue
         const avgOrderFen = orderCount > 0 ? Math.round(revenueFen / orderCount) : 0
@@ -116,7 +125,7 @@ export async function dashboardRoutes(app: FastifyInstance): Promise<void> {
                     SUM(oi.quantity) AS quantity,
                     SUM(oi.unit_price * oi.quantity) AS amount
              FROM order_items oi JOIN orders o ON o.id = oi.order_id
-             WHERE o.status != 'cancelled' ${storeFilter}
+             WHERE o.status IN ('paid', 'making', 'pickable', 'completed') ${storeFilter}
              GROUP BY oi.product_id, oi.product_name
              ORDER BY quantity DESC, amount DESC, oi.product_id ASC
              LIMIT 10`,

@@ -91,6 +91,9 @@ export async function adminAccountRoutes(app: FastifyInstance): Promise<void> {
         let storeId: number | null = null
         if (body.storeId !== undefined && body.storeId !== null && body.storeId !== '') {
           const value = Number(body.storeId)
+          if (typeof body.storeId !== 'number' && typeof body.storeId !== 'string') {
+            fail('BAD_REQUEST', '绑定门店 id 不合法')
+          }
           if (!Number.isInteger(value) || value <= 0) {
             fail('BAD_REQUEST', '绑定门店 id 不合法')
           }
@@ -104,11 +107,16 @@ export async function adminAccountRoutes(app: FastifyInstance): Promise<void> {
           fail('BAD_REQUEST', '店员账号必须绑定门店')
         }
         let password: string
-        if (typeof body.password === 'string' && body.password.length > 0) {
+        if (typeof body.password === 'string' && body.password.trim().length > 0) {
           if (body.password.length < 6) {
             fail('BAD_REQUEST', '密码至少 6 位')
           }
+          if (body.password.trim() !== body.password) {
+            fail('BAD_REQUEST', '密码首尾不能包含空格')
+          }
           password = body.password
+        } else if (body.password !== undefined && typeof body.password === 'string' && body.password.length > 0) {
+          fail('BAD_REQUEST', '密码不能为空白字符')
         } else {
           password = randomBytes(12).toString('hex')
         }
@@ -178,8 +186,16 @@ export async function adminAccountRoutes(app: FastifyInstance): Promise<void> {
           fail('NOT_FOUND', '账号不存在')
         }
         const provided = request.body?.password
-        if (provided !== undefined && (typeof provided !== 'string' || provided.length < 6)) {
-          fail('BAD_REQUEST', '密码至少 6 位')
+        if (provided !== undefined) {
+          if (typeof provided !== 'string' || provided.length < 6) {
+            fail('BAD_REQUEST', '密码至少 6 位')
+          }
+          if (provided.trim() !== provided) {
+            fail('BAD_REQUEST', '密码首尾不能包含空格')
+          }
+        }
+        if (typeof provided === 'string' && provided.trim().length === 0) {
+          fail('BAD_REQUEST', '密码不能为空白字符')
         }
         const password =
           typeof provided === 'string' && provided.length > 0 ? provided : randomBytes(12).toString('hex')
@@ -232,6 +248,9 @@ export async function adminAccountRoutes(app: FastifyInstance): Promise<void> {
             nextStoreId = null
           } else {
             const value = Number(body.storeId)
+            if (typeof body.storeId !== 'number' && typeof body.storeId !== 'string') {
+              fail('BAD_REQUEST', '绑定门店 id 不合法')
+            }
             if (!Number.isInteger(value) || value <= 0) {
               fail('BAD_REQUEST', '绑定门店 id 不合法')
             }

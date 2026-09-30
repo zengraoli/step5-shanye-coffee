@@ -20,6 +20,7 @@ import { specLabel } from '../lib/specs.js'
 import { grantPointsForOrder } from './points.js'
 import { withTransaction } from '../db/tx.js'
 import { maskPhone } from '../lib/phone.js'
+import { readPagination, readDate } from '../lib/pagination.js'
 
 export type OrderType = 'takeout' | 'dine_in'
 
@@ -118,15 +119,37 @@ function uniqueOrderNo(db: Db): string {
   fail('INTERNAL', '订单号生成失败，请重试')
 }
 
-function uniquePickupCode(db: Db): string {
-  for (let attempt = 0; attempt < 20; attempt += 1) {
+/** 北京时间当天起点（UTC） */
+function beijingTodayStart(): string {
+  const now = new Date()
+  const shifted = new Date(now.getTime() + 8 * 60 * 60 * 1000)
+  const date = shifted.toISOString().slice(0, 10)
+  return new Date(`${date}T00:00:00+08:00`).toISOString()
+}
+
+/**
+ * 生成 4 位取餐码：与进行中的订单全局查重，
+ * 同时与同一门店当天（含已完成 / 已取消）的订单查重，避免取餐叫号重复。
+ */
+function uniquePickupCode(db: Db, storeId: number): string {
+  const todayStart = beijingTodayStart()
+  for (let attempt = 0; attempt < 50; attempt += 1) {
     const code = generatePickupCode()
-    const exists = db
+    const active = db
       .prepare(`SELECT id FROM orders WHERE pickup_code = ? AND status IN ('paid', 'making', 'pickable')`)
       .get(code)
-    if (!exists) {
-      return code
+    if (active) {
+      continue
     }
+    const sameDay = db
+      .prepare(
+        `SELECT id FROM orders WHERE pickup_code = ? AND store_id = ? AND created_at >= ? LIMIT 1`,
+      )
+      .get(code, storeId, todayStart)
+    if (sameDay) {
+      continue
+    }
+    return code
   }
   fail('INTERNAL', '取餐码生成失败，请重试')
 }
@@ -362,14 +385,13 @@ export async function orderRoutes(app: FastifyInstance): Promise<void> {
           conditions.push('status = ?')
           params.push(request.query.status)
         }
-        const page = Math.max(1, Number(request.query.page ?? 1) || 1)
-        const pageSize = Math.min(50, Math.max(1, Number(request.query.page_size ?? 10) || 10))
+        const { page, pageSize, offset } = readPagination(request.query, { defaultSize: 10, maxSize: 50 })
         const totalRow = db
           .prepare(`SELECT COUNT(*) AS n FROM orders WHERE ${conditions.join(' AND ')}`)
           .get(...params) as unknown as { n: number }
         const rows = db
           .prepare(`SELECT * FROM orders WHERE ${conditions.join(' AND ')} ORDER BY id DESC LIMIT ? OFFSET ?`)
-          .all(...params, pageSize, (page - 1) * pageSize) as unknown as OrderRow[]
+          .all(...params, pageSize, offset) as unknown as OrderRow[]
         return sendOk(reply, {
           list: rows.map((row) => serializeOrder(db, row)),
           total: totalRow.n,
@@ -414,7 +436,7 @@ export async function orderRoutes(app: FastifyInstance): Promise<void> {
         fail('ORDER_STATUS_INVALID', `当前状态为${ORDER_STATUS_TEXT[order.status as OrderStatus]}，不能支付`)
       }
       const now = new Date().toISOString()
-      const pickupCode = uniquePickupCode(db)
+      const pickupCode = uniquePickupCode(db, order.store_id)
       withTransaction(db, () => {
         // 支付前重新校验优惠券：已被其他订单用掉、已过期或已停用时不允许支付
         if (order.member_coupon_id !== null) {
@@ -549,12 +571,9 @@ export async function orderRoutes(app: FastifyInstance): Promise<void> {
         params.push(query.status)
       }
       if (query.date !== undefined && query.date !== '') {
-        const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(query.date.trim())
-        if (!match) {
-          fail('BAD_REQUEST', '日期格式应为 YYYY-MM-DD')
-        }
-        const startUtc = new Date(`${query.date.trim()}T00:00:00+08:00`).toISOString()
-        const endUtc = new Date(`${query.date.trim()}T23:59:59.999+08:00`).toISOString()
+        const date = readDate(query.date)
+        const startUtc = new Date(`${date}T00:00:00+08:00`).toISOString()
+        const endUtc = new Date(`${date}T23:59:59.999+08:00`).toISOString()
         conditions.push('o.created_at >= ? AND o.created_at <= ?')
         params.push(startUtc, endUtc)
       }
@@ -563,8 +582,7 @@ export async function orderRoutes(app: FastifyInstance): Promise<void> {
         params.push(`%${query.keyword.trim()}%`, `%${query.keyword.trim()}%`)
       }
       const where = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : ''
-      const page = Math.max(1, Number(query.page ?? 1) || 1)
-      const pageSize = Math.min(100, Math.max(1, Number(query.page_size ?? 20) || 20))
+      const { page, pageSize, offset } = readPagination(query, { defaultSize: 20, maxSize: 100 })
       const totalRow = db
         .prepare(`SELECT COUNT(*) AS n FROM orders o JOIN members m ON m.id = o.member_id ${where}`)
         .get(...params) as unknown as { n: number }
@@ -576,7 +594,7 @@ export async function orderRoutes(app: FastifyInstance): Promise<void> {
            JOIN stores s ON s.id = o.store_id
            ${where} ORDER BY o.id DESC LIMIT ? OFFSET ?`,
         )
-        .all(...params, pageSize, (page - 1) * pageSize) as unknown as (OrderRow & {
+        .all(...params, pageSize, offset) as unknown as (OrderRow & {
         member_phone: string
         member_nickname: string
         store_name: string

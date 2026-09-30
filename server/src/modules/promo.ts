@@ -67,6 +67,16 @@ function serializePromo(activity: PromoActivity | null, now: Date) {
   }
 }
 
+/** 活动时间必须为完整 ISO8601（含秒），并是真实存在的时间 */
+function isIsoDateTime(value: string): boolean {
+  const match = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2})(?:\.\d{1,3})?)?(Z|[+-]\d{2}:\d{2})$/.exec(value)
+  if (!match) {
+    return false
+  }
+  const date = new Date(value)
+  return !Number.isNaN(date.getTime())
+}
+
 const ISO_RE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/
 
 /** 活动接口：公开查询当前活动 + 后台配置 */
@@ -125,13 +135,17 @@ export async function promoRoutes(app: FastifyInstance): Promise<void> {
           ? body.endAt.trim()
           : (current?.endAt ?? new Date(Date.now() + 30 * 24 * 3600 * 1000).toISOString())
 
+        if (!isIsoDateTime(startAt) || !isIsoDateTime(endAt)) {
+          fail('BAD_REQUEST', '活动时间必须为完整的 ISO8601 时间，如 2026-09-01T00:00:00.000Z')
+        }
         const startTime = new Date(startAt).getTime()
         const endTime = new Date(endAt).getTime()
-        if (Number.isNaN(startTime) || Number.isNaN(endTime)) {
-          fail('BAD_REQUEST', '活动时间必须为合法的 ISO8601 时间')
-        }
         if (endTime <= startTime) {
           fail('BAD_REQUEST', '活动结束时间必须晚于开始时间')
+        }
+        const maxDays = 3660
+        if (endTime - startTime > maxDays * 24 * 3600 * 1000) {
+          fail('BAD_REQUEST', '活动时长不能超过 10 年')
         }
 
         let productIds: number[] = current?.productIds ?? []
