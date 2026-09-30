@@ -55,10 +55,26 @@ adb shell am start -a android.intent.action.VIEW -d "shanye://order-detail/123"
 ## 测试
 
 ```bash
-./gradlew testDebugUnitTest          # 单元测试（金额/时间格式化、购物车、ViewModel）
+./gradlew testDebugUnitTest          # 单元测试（金额/时间格式化、购物车、ViewModel、深链、底部 Tab）
 ./gradlew recordRoborazziDebug       # 重新录制页面截图到 android/screenshots/
 ./gradlew verifyRoborazziDebug       # 截图回归校验
 ```
+
+### 与真实 server 联调
+
+`app/src/test/.../integration/AndroidFlowIntegrationTest.kt` 用真实接口走
+“登录 → 领券 → 报价（用券 / 不用券）→ 下单 → 支付 → 订单详情 → 积分刷新 → 重复支付拦截”，
+因此需要一个正在运行的 server（默认 `http://127.0.0.1:3000`，模拟器用 `10.0.2.2`）：
+
+```bash
+# Windows 宿主机
+./gradlew testDebugUnitTest --tests "com.shanye.coffee.integration.*"
+
+# Android 模拟器访问宿主机
+./gradlew testDebugUnitTest --tests "com.shanye.coffee.integration.*" -PAPI_BASE_URL=http://10.0.2.2:3000
+```
+
+联调用例会真实写入数据库（每次运行用新的手机号），请在测试库上运行。
 
 截图测试使用 Robolectric + Compose 与演示数据渲染六个页面（登录 / 首页 / 点单 / 确认订单 / 订单详情 / 我的），产出在 `android/screenshots/` 并随仓库提交。
 

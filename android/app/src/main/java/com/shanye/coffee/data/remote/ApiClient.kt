@@ -52,7 +52,11 @@ object ApiClient {
         explicitNulls = false
     }
 
-    fun createService(tokenProvider: () -> String?): ApiService {
+    /** 默认使用 BuildConfig 的接口地址；测试可显式指定 baseUrl（如 http://10.0.2.2:3000） */
+    fun createService(tokenProvider: () -> String?): ApiService =
+        createService(BuildConfig.API_BASE_URL, tokenProvider)
+
+    fun createService(baseUrl: String, tokenProvider: () -> String?): ApiService {
         val logging = HttpLoggingInterceptor().apply {
             level = if (BuildConfig.DEBUG) HttpLoggingInterceptor.Level.BASIC else HttpLoggingInterceptor.Level.NONE
         }
@@ -63,7 +67,7 @@ object ApiClient {
             .readTimeout(java.time.Duration.ofSeconds(15))
             .build()
         return Retrofit.Builder()
-            .baseUrl(BuildConfig.API_BASE_URL.trimEnd('/') + "/")
+            .baseUrl(baseUrl.trimEnd('/') + "/")
             .client(client)
             .addConverterFactory(json.asConverterFactory("application/json".toMediaType()))
             .build()
