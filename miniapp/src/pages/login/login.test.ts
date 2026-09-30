@@ -1,11 +1,12 @@
-import { readFileSync } from 'node:fs'
-import { resolve } from 'node:path'
 import { describe, expect, test } from 'vitest'
+
+// 用源码原文做守卫断言（Vite / Vitest 支持 ?raw 导入，避免 node 类型依赖）
+import loginSource from './login.vue?raw'
 
 /**
  * 第三轮验收补充：
  * - 登录成功后回跳来源页（只允许站内 pages 路径，防开放重定向）
- * - 编译产物不得出现 vue-router（uni-app 页面跳转必须用 uni.* API）
+ * - 登录页不得使用 vue-router（uni-app 页面跳转必须用 uni.* API，否则编译产物会引用不存在的依赖）
  */
 describe('登录回跳来源页', () => {
   /** 与 login.vue 的 onLoad 逻辑保持一致：只接受站内 pages 路径 */
@@ -27,28 +28,23 @@ describe('登录回跳来源页', () => {
   })
 
   test('外部地址被忽略（防开放重定向）', () => {
-    expect(resolveRedirect('https://evil.example.com')).toBe('/pages/profile/profile')
-    expect(resolveRedirect('//evil.example.com')).toBe('/pages/profile/profile')
+    expect(resolveRedirect('https://example.invalid')).toBe('/pages/profile/profile')
+    expect(resolveRedirect('//example.invalid')).toBe('/pages/profile/profile')
     expect(resolveRedirect('/member')).toBe('/pages/profile/profile')
   })
 })
 
 describe('登录页不使用 vue-router', () => {
-  const source = readFileSync(
-    resolve(process.cwd(), 'src/pages/login/login.vue'),
-    'utf-8',
-  )
-
   test('源码不 import vue-router 的 API', () => {
-    expect(source).not.toMatch(/from ['"]vue-router['"]/)
-    expect(source).not.toMatch(/useRouter\(\)/)
-    expect(source).not.toMatch(/useRoute\(\)/)
-    expect(source).not.toMatch(/router\.replace\(/)
+    expect(loginSource).not.toMatch(/from ['"]vue-router['"]/)
+    expect(loginSource).not.toMatch(/useRouter\(\)/)
+    expect(loginSource).not.toMatch(/useRoute\(\)/)
+    expect(loginSource).not.toMatch(/router\.replace\(/)
   })
 
   test('跳转使用 uni API 并在 onLoad 中读取 redirect', () => {
-    expect(source).toMatch(/uni\.redirectTo\(/)
-    expect(source).toMatch(/onLoad\(/)
-    expect(source).toMatch(/redirect/)
+    expect(loginSource).toMatch(/uni\.redirectTo\(/)
+    expect(loginSource).toMatch(/onLoad\(/)
+    expect(loginSource).toMatch(/redirect/)
   })
 })

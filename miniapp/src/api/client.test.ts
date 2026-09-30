@@ -104,11 +104,12 @@ describe('登录态失效（401 / 业务码 10002）', () => {
         options.success?.({
           data: { code, data: null, message: '未登录或登录已过期' },
           statusCode,
-        } as UniApp.RequestSuccessCallbackResult)
+        } as unknown as UniApp.RequestSuccessCallbackResult)
       },
       reLaunch,
-      getCurrentPages: () => [{ route: 'pages/orders/orders', options: { id: '3' } }],
     })
+    // client 端优先用全局 getCurrentPages()（小程序运行时提供），测试里桩掉
+    vi.stubGlobal('getCurrentPages', () => [{ route: 'pages/orders/orders', options: { id: '3' } }])
     const mod = await import('./client')
     return { mod, reLaunch }
   }
@@ -128,6 +129,9 @@ describe('登录态失效（401 / 业务码 10002）', () => {
       points: 0,
       level: 'silver',
       levelText: '银卡',
+      nextLevel: 'gold',
+      nextLevelText: '金卡',
+      pointsToNextLevel: 500,
       createdAt: '2026-09-26T02:00:00.000Z',
     })
     await expect(mod.apiFetch('/api/v1/orders')).rejects.toThrow('未登录或登录已过期')
@@ -170,8 +174,8 @@ describe('登录态失效（401 / 业务码 10002）', () => {
         options.fail?.({ errMsg: 'request:fail' })
       },
       reLaunch,
-      getCurrentPages: () => [{ route: 'pages/index/index', options: {} }],
     })
+    vi.stubGlobal('getCurrentPages', () => [{ route: 'pages/index/index', options: {} }])
     const mod = await import('./client')
     await expect(mod.apiFetch('/api/v1/stores')).rejects.toThrow('网络异常，请检查服务是否启动')
     expect(reLaunch).not.toHaveBeenCalled()
