@@ -10,6 +10,8 @@ export interface StorePayload {
   phone?: string
   openTime?: string
   closeTime?: string
+  /** 手动休息开关：true 临时闭店 / false 恢复营业 */
+  manualClosed?: boolean
 }
 
 /** 后台门店列表（含营业状态） */

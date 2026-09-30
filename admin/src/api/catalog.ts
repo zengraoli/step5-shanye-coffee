@@ -15,6 +15,8 @@ export interface Store {
   phone: string
   openTime: string
   closeTime: string
+  /** 手动休息开关：true 表示临时闭店（无需改营业时间） */
+  manualClosed?: boolean
   status: 'open' | 'rest'
   statusText: string
 }

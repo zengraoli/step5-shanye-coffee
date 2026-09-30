@@ -50,6 +50,15 @@ const ROLE_TEXT: Record<AdminRole, string> = {
   staff: '店员',
 }
 
+/** storeId 规整为数字 / null（服务端只接受数字或 null，布尔值会被拒绝） */
+function resolveStoreId(value: string): number | null {
+  if (value === '' || value === 'none') {
+    return null
+  }
+  const id = Number(value)
+  return Number.isInteger(id) && id > 0 ? id : null
+}
+
 /** 账号与角色管理页 */
 export function AccountsPage() {
   const current = getProfile()
@@ -253,6 +262,12 @@ function CreateAccountDialog({ open, stores, onClose, onCreated }: CreateAccount
     setCreatedPassword('')
   }, [open, stores])
 
+  /** 角色切换：店员需重新选择门店，管理员固定不绑定 */
+  const changeRole = (value: string | null) => {
+    setRole((value ?? 'staff') as AdminRole)
+    setStoreId('')
+  }
+
   const onSubmit = async (event: FormEvent) => {
     event.preventDefault()
     setError('')
@@ -265,7 +280,7 @@ function CreateAccountDialog({ open, stores, onClose, onCreated }: CreateAccount
       return
     }
     if (role === 'staff' && storeId === '') {
-      setError('店员账号必须绑定门店')
+      setError('请选择绑定门店')
       return
     }
     setSaving(true)
@@ -274,7 +289,7 @@ function CreateAccountDialog({ open, stores, onClose, onCreated }: CreateAccount
         username: username.trim(),
         password: password.length > 0 ? password : undefined,
         role,
-        storeId: storeId === '' ? null : Number(storeId),
+        storeId: resolveStoreId(storeId),
         nickname: nickname.trim() || undefined,
       })
       setCreatedPassword(result.password)
@@ -331,7 +346,7 @@ function CreateAccountDialog({ open, stores, onClose, onCreated }: CreateAccount
                 <Label htmlFor="account-role">角色</Label>
                 <Select
                   value={role}
-                  onValueChange={(value) => setRole((value ?? 'staff') as AdminRole)}
+                  onValueChange={changeRole}
                 >
                   <SelectTrigger id="account-role">
                     <SelectValue>{role === 'admin' ? '管理员' : '店员'}</SelectValue>
@@ -347,15 +362,16 @@ function CreateAccountDialog({ open, stores, onClose, onCreated }: CreateAccount
                 <Select
                   value={storeId || 'none'}
                   onValueChange={(value) => setStoreId(value === 'none' || value === null ? '' : value)}
-                  disabled={role === 'staff'}
+                  disabled={role !== 'staff'}
                 >
                   <SelectTrigger id="account-store">
                     <SelectValue>
-                      {(storeId && stores.find((item) => String(item.id) === storeId)?.name) || '不绑定'}
+                      {(storeId && stores.find((item) => String(item.id) === storeId)?.name) ||
+                        (role === 'staff' ? '请选择绑定门店' : '不绑定')}
                     </SelectValue>
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="none">不绑定</SelectItem>
+                    {role === 'staff' ? null : <SelectItem value="none">不绑定</SelectItem>}
                     {stores.map((store) => (
                       <SelectItem key={store.id} value={String(store.id)}>
                         {store.name}
@@ -363,6 +379,9 @@ function CreateAccountDialog({ open, stores, onClose, onCreated }: CreateAccount
                     ))}
                   </SelectContent>
                 </Select>
+                <p className="text-xs text-muted-foreground">
+                  {role === 'staff' ? '店员必须绑定一个门店' : '管理员拥有全部权限，无需绑定门店'}
+                </p>
               </div>
             </div>
             <div className="space-y-1.5">
@@ -426,14 +445,14 @@ function EditAccountDialog({ account, stores, onClose, onSaved }: EditAccountDia
     }
     setError('')
     if (role === 'staff' && storeId === '') {
-      setError('店员账号必须绑定门店')
+      setError('请选择绑定门店')
       return
     }
     setSaving(true)
     try {
       await updateAccount(account.id, {
         role,
-        storeId: storeId === '' ? null : Number(storeId),
+        storeId: role === 'admin' ? null : resolveStoreId(storeId),
         nickname: nickname.trim() || undefined,
       })
       toast.success(`已更新「${account.username}」的角色`)
@@ -455,7 +474,13 @@ function EditAccountDialog({ account, stores, onClose, onSaved }: EditAccountDia
         <form className="space-y-4" onSubmit={(event) => void onSubmit(event)}>
           <div className="space-y-1.5">
             <Label htmlFor="edit-role">角色</Label>
-            <Select value={role} onValueChange={(value) => setRole((value ?? 'staff') as AdminRole)}>
+            <Select
+              value={role}
+              onValueChange={(value) => {
+                setRole((value ?? 'staff') as AdminRole)
+                setStoreId('')
+              }}
+            >
               <SelectTrigger id="edit-role">
                 <SelectValue>{role === 'admin' ? '管理员' : '店员'}</SelectValue>
               </SelectTrigger>
@@ -470,15 +495,16 @@ function EditAccountDialog({ account, stores, onClose, onSaved }: EditAccountDia
             <Select
               value={storeId || 'none'}
               onValueChange={(value) => setStoreId(value === 'none' || value === null ? '' : value)}
-              disabled={role === 'staff'}
+              disabled={role !== 'staff'}
             >
               <SelectTrigger id="edit-store">
                 <SelectValue>
-                  {(storeId && stores.find((item) => String(item.id) === storeId)?.name) || '不绑定'}
+                  {(storeId && stores.find((item) => String(item.id) === storeId)?.name) ||
+                    (role === 'staff' ? '请选择绑定门店' : '不绑定')}
                 </SelectValue>
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="none">不绑定</SelectItem>
+                {role === 'staff' ? null : <SelectItem value="none">不绑定</SelectItem>}
                 {stores.map((store) => (
                   <SelectItem key={store.id} value={String(store.id)}>
                     {store.name}
@@ -486,6 +512,9 @@ function EditAccountDialog({ account, stores, onClose, onSaved }: EditAccountDia
                 ))}
               </SelectContent>
             </Select>
+            <p className="text-xs text-muted-foreground">
+              {role === 'staff' ? '店员必须绑定一个门店' : '管理员拥有全部权限，无需绑定门店'}
+            </p>
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="edit-nickname">昵称</Label>

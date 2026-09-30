@@ -1,10 +1,11 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
+import { createContext, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useState, type ReactNode } from 'react'
 import {
   apiFetch,
   clearSession,
   getProfile,
   getToken,
   setSession,
+  setUnauthorizedHandler,
   type AdminProfile,
 } from '@/api/client'
 
@@ -17,6 +18,8 @@ interface AuthContextValue {
   login: (username: string, password: string) => Promise<void>
   /** 退出登录 */
   logout: () => void
+  /** 会话失效：清理本地会话并回到未登录态（由接口层 401/10002 触发） */
+  handleUnauthorized: () => void
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null)
@@ -75,9 +78,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setStatus('anonymous')
   }, [])
 
+  const handleUnauthorized = useCallback(() => {
+    clearSession()
+    setProfile(null)
+    setStatus('anonymous')
+  }, [])
+
+  // 注册接口层会话失效回调：用 layout effect 保证子页面首次请求前已就绪
+  useLayoutEffect(() => setUnauthorizedHandler(handleUnauthorized), [handleUnauthorized])
+
   const value = useMemo<AuthContextValue>(
-    () => ({ status, profile, login, logout }),
-    [status, profile, login, logout],
+    () => ({ status, profile, login, logout, handleUnauthorized }),
+    [status, profile, login, logout, handleUnauthorized],
   )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

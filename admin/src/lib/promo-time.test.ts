@@ -9,9 +9,15 @@ describe('活动时间转换', () => {
     expect(isoToLocalInput('bad')).toBe('')
   })
 
+  test('秒不为 0 时保留到秒（23:59:59 不会被改成 23:59:00）', () => {
+    expect(isoToLocalInput('2026-12-31T15:59:59.000Z')).toBe('2026-12-31T23:59:59')
+    expect(isoToLocalInput('2026-09-01T00:00:30.000Z')).toBe('2026-09-01T08:00:30')
+  })
+
   test('北京时间输入值 → UTC ISO8601', () => {
     expect(localInputToIso('2026-09-01T08:00')).toBe('2026-09-01T00:00:00.000Z')
     expect(localInputToIso('2026-09-27T00:05')).toBe('2026-09-26T16:05:00.000Z')
+    expect(localInputToIso('2026-12-31T23:59:59')).toBe('2026-12-31T15:59:59.000Z')
     expect(localInputToIso('')).toBeNull()
     expect(localInputToIso('bad')).toBeNull()
   })
@@ -19,6 +25,9 @@ describe('活动时间转换', () => {
   test('往返转换保持一致', () => {
     const iso = '2026-09-26T16:05:00.000Z'
     expect(localInputToIso(isoToLocalInput(iso))).toBe(iso)
+    // 带秒的时间往返同样一致
+    const isoWithSeconds = '2026-12-31T15:59:59.000Z'
+    expect(localInputToIso(isoToLocalInput(isoWithSeconds))).toBe(isoWithSeconds)
   })
 })
 

@@ -1,4 +1,4 @@
-import { AlertCircle, Clock, MapPin, Pencil, Phone, RefreshCw } from 'lucide-react'
+import { AlertCircle, Clock, MapPin, Moon, Pencil, Phone, RefreshCw, Sun } from 'lucide-react'
 import { useCallback, useEffect, useState, type FormEvent } from 'react'
 import { fetchAdminStores, updateStore, type Store, type StorePayload } from '@/api/stores'
 import { ApiError } from '@/api/client'
@@ -43,6 +43,22 @@ export function StoresPage() {
     void load()
   }, [load])
 
+  /** 手动休息 / 恢复营业 */
+  const toggleManualClosed = async (store: Store) => {
+    const next = !store.manualClosed
+    const previous = stores
+    // 乐观更新，失败后回滚
+    setStores((current) => current.map((item) => (item.id === store.id ? { ...item, manualClosed: next } : item)))
+    try {
+      await updateStore(store.id, { manualClosed: next })
+      toast.success(next ? `已让「${store.name}」手动休息` : `已恢复「${store.name}」营业`)
+      await load()
+    } catch (err) {
+      setStores(previous)
+      toast.error(err instanceof ApiError ? err.message : '操作失败')
+    }
+  }
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
@@ -75,9 +91,16 @@ export function StoresPage() {
               <CardContent className="flex flex-1 flex-col gap-3 pt-6">
                 <div className="flex items-start justify-between gap-2">
                   <h3 className="text-base font-semibold">{store.name}</h3>
-                  <Badge variant={store.status === 'open' ? 'default' : 'secondary'}>
-                    {store.statusText}
-                  </Badge>
+                  <div className="flex shrink-0 gap-1">
+                    <Badge variant={store.status === 'open' ? 'default' : 'secondary'}>
+                      {store.statusText}
+                    </Badge>
+                    {store.manualClosed ? (
+                      <Badge variant="destructive" className="font-normal">
+                        手动休息中
+                      </Badge>
+                    ) : null}
+                  </div>
                 </div>
                 <div className="space-y-1.5 text-sm text-muted-foreground">
                   <p className="flex items-start gap-2">
@@ -93,9 +116,17 @@ export function StoresPage() {
                     每日 {store.openTime} - {store.closeTime}
                   </p>
                 </div>
-                <div className="mt-auto flex justify-end">
+                <div className="mt-auto flex items-center justify-between gap-2">
                   <Button
                     variant="outline"
+                    size="sm"
+                    onClick={() => void toggleManualClosed(store)}
+                  >
+                    {store.manualClosed ? <Sun className="size-3.5" /> : <Moon className="size-3.5" />}
+                    {store.manualClosed ? '恢复营业' : '手动休息'}
+                  </Button>
+                  <Button
+                    variant="ghost"
                     size="sm"
                     onClick={() => {
                       setEditing(store)

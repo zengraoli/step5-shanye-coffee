@@ -21,6 +21,7 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
@@ -355,7 +356,17 @@ export function OrdersPage() {
         </CardContent>
       </Card>
 
-      <OrderDetailDialog open={detailOpen} order={detail} onClose={() => setDetailOpen(false)} />
+      <OrderDetailDialog
+        open={detailOpen}
+        order={detail}
+        onClose={() => setDetailOpen(false)}
+        onAdvance={() => {
+          if (detail) {
+            void advance(detail)
+          }
+        }}
+        advancing={detail !== null && advancing === detail.id}
+      />
     </div>
   )
 }
@@ -364,10 +375,14 @@ interface OrderDetailDialogProps {
   open: boolean
   order: AdminOrderDetail | null
   onClose: () => void
+  /** 推进订单状态（与列表行同一个 advance） */
+  onAdvance: () => void
+  /** 是否正在推进该订单 */
+  advancing: boolean
 }
 
 /** 订单详情弹窗 */
-function OrderDetailDialog({ open, order, onClose }: OrderDetailDialogProps) {
+function OrderDetailDialog({ open, order, onClose, onAdvance, advancing }: OrderDetailDialogProps) {
   const action = order ? NEXT_ACTION_TEXT[order.status] : undefined
   return (
     <Dialog open={open} onOpenChange={(value) => (value ? undefined : onClose())}>
@@ -446,6 +461,13 @@ function OrderDetailDialog({ open, order, onClose }: OrderDetailDialogProps) {
               <p className="rounded-md bg-brand-muted/50 px-3 py-2 text-xs text-brand">
                 下一步操作：{action}
               </p>
+            ) : null}
+            {action ? (
+              <DialogFooter>
+                <Button type="button" disabled={advancing} onClick={onAdvance}>
+                  {advancing ? '处理中' : `推进状态：${action}`}
+                </Button>
+              </DialogFooter>
             ) : null}
           </>
         ) : (

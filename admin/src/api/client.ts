@@ -64,6 +64,27 @@ export function clearSession(): void {
   localStorage.removeItem(PROFILE_KEY)
 }
 
+/** 会话失效时的全局回调（由 AuthProvider 注册，用于跳转登录页） */
+type UnauthorizedHandler = (message: string) => void
+
+let unauthorizedHandler: UnauthorizedHandler | null = null
+
+/** 注册 / 注销会话失效回调；返回注销函数 */
+export function setUnauthorizedHandler(handler: UnauthorizedHandler | null): () => void {
+  unauthorizedHandler = handler
+  return () => {
+    if (unauthorizedHandler === handler) {
+      unauthorizedHandler = null
+    }
+  }
+}
+
+/** 会话失效（code === 10002 或 HTTP 401）：清理本地会话并通知 React 跳登录页 */
+function handleUnauthorizedFromApi(message: string): void {
+  clearSession()
+  unauthorizedHandler?.(message)
+}
+
 interface RequestOptions {
   method?: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE'
   body?: unknown
@@ -101,6 +122,12 @@ export async function apiFetch<T>(path: string, options: RequestOptions = {}): P
     })
   }
   if (payload.code !== 0) {
+    // 会话失效：code === 10002 或 HTTP 401 时集中清理会话并通知跳登录页
+    if (response.status === 401 || payload.code === 10002) {
+      handleUnauthorizedFromApi(
+        (payload as ApiErr).message || '未登录或登录已过期，请重新登录',
+      )
+    }
     throw new ApiError(response.status, payload as ApiErr)
   }
   return (payload as ApiOk<T>).data

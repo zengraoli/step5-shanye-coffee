@@ -279,6 +279,10 @@ function CouponDialog({ open, coupon, onClose, onSaved }: CouponDialogProps) {
         setError('满减券需填写使用门槛与减免金额')
         return
       }
+      if (reduceFen > thresholdFen) {
+        setError('减免金额不能大于使用门槛')
+        return
+      }
       payload.thresholdFen = thresholdFen
       payload.reduceFen = reduceFen
     } else {
@@ -297,14 +301,12 @@ function CouponDialog({ open, coupon, onClose, onSaved }: CouponDialogProps) {
       payload.thresholdFen = thresholdFen
       payload.maxReduceFen = maxReduceFen
     }
-    if (!coupon) {
-      const total = Number(form.total)
-      if (!Number.isInteger(total) || total <= 0) {
-        setError('发放总量必须为大于 0 的整数')
-        return
-      }
-      payload.total = total
+    const total = Number(form.total)
+    if (!Number.isInteger(total) || total <= 0) {
+      setError('发放总量必须为大于 0 的整数')
+      return
     }
+    payload.total = total
 
     setSaving(true)
     try {
@@ -413,22 +415,32 @@ function CouponDialog({ open, coupon, onClose, onSaved }: CouponDialogProps) {
                 onChange={(event) => setForm({ ...form, validDays: event.target.value })}
               />
             </div>
-            {!coupon ? (
-              <div className="space-y-1.5">
-                <Label htmlFor="coupon-total">发放总量</Label>
-                <Input
-                  id="coupon-total"
-                  inputMode="numeric"
-                  value={form.total}
-                  onChange={(event) => setForm({ ...form, total: event.target.value })}
-                />
-              </div>
-            ) : null}
+            <div className="space-y-1.5">
+              <Label htmlFor="coupon-total">发放总量</Label>
+              <Input
+                id="coupon-total"
+                inputMode="numeric"
+                value={form.total}
+                onChange={(event) => setForm({ ...form, total: event.target.value })}
+              />
+              {coupon ? (
+                <p className="text-xs text-muted-foreground">
+                  已领取 {coupon.claimedCount ?? coupon.total - coupon.remaining} 张，总量只能调大、不能低于已领取数量；
+                  调大后剩余量同步增加。
+                </p>
+              ) : null}
+            </div>
           </div>
           {coupon ? (
-            <p className="rounded-md bg-muted/60 px-3 py-2 text-xs text-muted-foreground">
-              当前规则：{describeCoupon(coupon)}（修改后对新领取的券生效）
-            </p>
+            <div className="space-y-1.5 rounded-md bg-muted/60 px-3 py-2 text-xs text-muted-foreground">
+              <p>当前规则：{describeCoupon(coupon)}</p>
+              <p>
+                修改后只对新领取的券生效；会员已领取的券按领取时的规则使用，不会被改动。
+              </p>
+              <p>
+                停用模板后：会员已领的券会显示“已失效”，不再被下单推荐，也不能用于下单。
+              </p>
+            </div>
           ) : null}
           {error ? (
             <p role="alert" className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">

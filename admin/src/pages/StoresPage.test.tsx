@@ -24,6 +24,7 @@ const STORES = [
     closeTime: '22:00',
     status: 'open',
     statusText: '营业中',
+    manualClosed: false,
   },
   {
     id: 2,
@@ -34,8 +35,12 @@ const STORES = [
     closeTime: '22:30',
     status: 'rest',
     statusText: '休息中',
+    manualClosed: false,
   },
 ]
+
+/** 可变的门店数据，PUT 后回写，模拟服务端持久化 */
+const storeRows: typeof STORES = STORES.map((store) => ({ ...store }))
 
 function mockStoresApi() {
   vi.stubGlobal(
@@ -52,10 +57,13 @@ function mockStoresApi() {
       if (url.includes('/api/v1/admin/stores')) {
         if (method === 'PUT') {
           const id = Number(url.split('/').pop())
-          const store = STORES.find((item) => item.id === id)!
-          return json({ ...store, ...(body as object) })
+          const index = storeRows.findIndex((item) => item.id === id)
+          if (index >= 0) {
+            storeRows[index] = { ...storeRows[index], ...(body as object) }
+          }
+          return json(storeRows[index])
         }
-        return json(STORES)
+        return json(storeRows)
       }
       return json(null)
     }),
@@ -65,6 +73,7 @@ function mockStoresApi() {
 beforeEach(() => {
   clearStorage()
   calls = []
+  storeRows.splice(0, storeRows.length, ...STORES.map((store) => ({ ...store })))
   mockStoresApi()
 })
 
@@ -112,5 +121,25 @@ describe('StoresPage', () => {
       const put = calls.find((call) => call.method === 'PUT' && call.url.includes('/api/v1/admin/stores/1'))
       expect(put?.body).toMatchObject({ name: '山野咖啡 · 望京旗舰店', openTime: '08:00' })
     })
+  })
+
+  test('手动休息 / 恢复营业提交 manualClosed', async () => {
+    const user = userEvent.setup()
+    renderPage()
+    await screen.findByText('山野咖啡 · 望京店')
+
+    // 默认展示营业中，且没有“手动休息中”徽章
+    expect(screen.getByText('营业中')).toBeInTheDocument()
+    expect(screen.queryByText('手动休息中')).not.toBeInTheDocument()
+
+    await user.click(screen.getAllByRole('button', { name: '手动休息' })[0]!)
+    await waitFor(() => {
+      const put = calls.find(
+        (call) => call.method === 'PUT' && call.url.includes('/api/v1/admin/stores/1') && (call.body as { manualClosed?: boolean })?.manualClosed === true,
+      )
+      expect(put).toBeDefined()
+    })
+    // 乐观更新后按钮变成“恢复营业”
+    expect(await screen.findByRole('button', { name: '恢复营业' })).toBeInTheDocument()
   })
 })

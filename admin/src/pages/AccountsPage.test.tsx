@@ -194,6 +194,44 @@ describe('AccountsPage', () => {
     })
   })
 
+  test('绑定门店：店员必选、管理员固定不绑定，切换角色后重置', async () => {
+    const user = userEvent.setup()
+    renderPage()
+    await screen.findByText('admin')
+
+    await user.click(screen.getByRole('button', { name: '新增账号' }))
+    const dialog = await screen.findByRole('dialog')
+    const storeSelect = () => within(dialog).getByLabelText('绑定门店') as HTMLButtonElement
+
+    // 默认角色为店员：门店下拉可选中
+    expect(storeSelect()).toBeEnabled()
+
+    // 切到管理员：下拉禁用并固定“不绑定”
+    await user.click(within(dialog).getByLabelText('角色'))
+    await user.click(await screen.findByRole('option', { name: '管理员' }))
+    expect(storeSelect()).toBeDisabled()
+    expect(within(dialog).getByText('不绑定')).toBeInTheDocument()
+
+    // 再切回店员：storeId 被重置，必须重新选择
+    await user.click(within(dialog).getByLabelText('角色'))
+    await user.click(await screen.findByRole('option', { name: '店员' }))
+    await user.type(within(dialog).getByLabelText('账号'), 'newstaff2')
+    await user.click(within(dialog).getByRole('button', { name: '创建账号' }))
+    expect(await within(dialog).findByRole('alert')).toHaveTextContent('请选择绑定门店')
+    expect(
+      calls.some((call) => call.method === 'POST' && call.url.includes('/api/v1/admin/accounts')),
+    ).toBe(false)
+
+    // 选中门店后创建成功，storeId 为数字
+    await user.click(storeSelect())
+    await user.click(await screen.findByRole('option', { name: '山野咖啡 · 三里屯店' }))
+    await user.click(within(dialog).getByRole('button', { name: '创建账号' }))
+    await waitFor(() => {
+      const post = calls.find((call) => call.method === 'POST' && call.url.includes('/api/v1/admin/accounts'))
+      expect(post?.body).toMatchObject({ username: 'newstaff2', role: 'staff', storeId: 2 })
+    })
+  })
+
   test('当前登录账号不能停用', async () => {
     renderPage()
     await screen.findByText('admin')

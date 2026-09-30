@@ -224,6 +224,28 @@ describe('OrdersPage', () => {
     expect(screen.queryByLabelText('门店')).toBeInTheDocument()
   })
 
+  test('订单详情弹窗可推进状态（按钮禁用 → 成功后刷新列表）', async () => {
+    const user = userEvent.setup()
+    renderPage()
+    await screen.findByText('SY20260926000011')
+
+    await user.click(screen.getAllByRole('button', { name: '详情' })[0]!)
+    const dialog = await screen.findByRole('dialog')
+    expect(within(dialog).getByText('下一步操作：开始制作')).toBeInTheDocument()
+
+    const advanceButton = within(dialog).getByRole('button', { name: '推进状态：开始制作' })
+    await user.click(advanceButton)
+
+    await waitFor(() => {
+      const post = calls.find((call) => call.method === 'POST' && call.url.includes('/orders/11/advance'))
+      expect(post?.url).toContain('/api/v1/admin/orders/11/advance')
+    })
+    // 成功后同时刷新列表与详情（详情变成“制作中”）
+    await waitFor(() => {
+      expect(within(dialog).getAllByText('制作中').length).toBeGreaterThan(0)
+    })
+  })
+
   test('接口错误时展示重试', async () => {
     vi.stubGlobal(
       'fetch',

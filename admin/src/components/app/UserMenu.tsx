@@ -1,6 +1,7 @@
 import { LogOut, UserCog } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
-import { clearSession, getProfile } from '@/api/client'
+import { getProfile } from '@/api/client'
+import { useAuth } from '@/auth/AuthContext'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -22,10 +23,13 @@ const ROLE_TEXT: Record<string, string> = {
 /** 顶栏用户菜单 */
 export function UserMenu() {
   const navigate = useNavigate()
+  const { logout } = useAuth()
   const profile = getProfile()
 
-  const logout = () => {
-    clearSession()
+  /** 退出登录：必须走 AuthContext，清 profile + 状态置 anonymous，
+   *  否则浏览器后退仍可回到后台页，接口再 401 */
+  const handleLogout = () => {
+    logout()
     navigate('/login', { replace: true })
   }
 
@@ -62,7 +66,7 @@ export function UserMenu() {
             <UserCog className="size-4" />
             当前角色：{ROLE_TEXT[profile.role] ?? profile.role}
           </DropdownMenuItem>
-          <DropdownMenuItem variant="destructive" onClick={logout}>
+          <DropdownMenuItem variant="destructive" onClick={handleLogout}>
             <LogOut className="size-4" />
             退出登录
           </DropdownMenuItem>

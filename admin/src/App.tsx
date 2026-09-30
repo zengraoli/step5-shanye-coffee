@@ -11,7 +11,7 @@ import { PromoPage } from '@/pages/PromoPage'
 import { StoresPage } from '@/pages/StoresPage'
 import { ProductsPage } from '@/pages/ProductsPage'
 import { LoginPage } from '@/pages/LoginPage'
-import { PlaceholderPage } from '@/pages/PlaceholderPage'
+import { NotFoundPage } from '@/pages/NotFoundPage'
 
 /** 后台路由：登录页公开，其余页面受路由守卫保护 */
 export default function App() {
@@ -36,7 +36,7 @@ export default function App() {
           <Route path="/coupons" element={<CouponsPage />} />
           <Route path="/accounts" element={<AccountsPage />} />
           <Route path="/promo" element={<PromoPage />} />
-          <Route path="*" element={<PlaceholderPage />} />
+          <Route path="*" element={<NotFoundPage />} />
         </Route>
       </Routes>
     </AuthProvider>

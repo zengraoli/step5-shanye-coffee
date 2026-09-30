@@ -277,10 +277,9 @@ function StatCard({
       <CardHeader className="gap-1 pb-2">
         <CardDescription>{title}</CardDescription>
         <CardTitle className={`text-2xl tabular-nums ${highlight ? 'text-brand' : ''}`}>{value}</CardTitle>
+        {/* 指标说明统一放在标题下方，与其它卡片的 CardDescription 写法一致 */}
+        <CardDescription className="text-xs">{hint}</CardDescription>
       </CardHeader>
-      <CardContent>
-        <p className="text-xs text-muted-foreground">{hint}</p>
-      </CardContent>
     </Card>
   )
 }

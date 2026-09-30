@@ -9,6 +9,7 @@ import { toast } from 'sonner'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Checkbox } from '@/components/ui/checkbox'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Separator } from '@/components/ui/separator'
@@ -93,12 +94,6 @@ export function PromoPage() {
     }
     return [...map.entries()]
   }, [filtered])
-
-  const toggleProduct = (id: number) => {
-    setSelected((current) =>
-      current.includes(id) ? current.filter((item) => item !== id) : [...current, id],
-    )
-  }
 
   const toggleCategory = (items: AdminProduct[]) => {
     const ids = items.map((item) => item.id)
@@ -205,6 +200,7 @@ export function PromoPage() {
                 <Input
                   id="promo-start"
                   type="datetime-local"
+                  step={1}
                   value={startAt}
                   onChange={(event) => setStartAt(event.target.value)}
                 />
@@ -214,6 +210,7 @@ export function PromoPage() {
                 <Input
                   id="promo-end"
                   type="datetime-local"
+                  step={1}
                   value={endAt}
                   onChange={(event) => setEndAt(event.target.value)}
                 />
@@ -265,11 +262,15 @@ export function PromoPage() {
                           checked ? 'border-brand bg-brand-muted/40' : 'border-border hover:bg-muted/50'
                         }`}
                       >
-                        <input
-                          type="checkbox"
-                          className="size-4 accent-[var(--brand)]"
+                        <Checkbox
                           checked={checked}
-                          onChange={() => toggleProduct(product.id)}
+                          onCheckedChange={(value) =>
+                            setSelected((current) =>
+                              value
+                                ? [...new Set([...current, product.id])]
+                                : current.filter((item) => item !== product.id),
+                            )
+                          }
                         />
                         <span className="flex-1">{product.name}</span>
                         <span className="text-xs text-muted-foreground">

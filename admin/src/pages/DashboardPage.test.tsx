@@ -4,6 +4,15 @@ import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { AuthProvider } from '@/auth/AuthContext'
 import { DashboardPage } from './DashboardPage'
 import { clearStorage } from '@/test/mockApi'
+import type { AdminProfile } from '@/api/client'
+
+const SEED_PROFILE: AdminProfile = {
+  id: 1,
+  username: 'admin',
+  role: 'admin',
+  storeId: null,
+  nickname: '系统管理员',
+}
 
 const DASHBOARD_FIXTURE = {
   scope: 'all',
@@ -133,5 +142,25 @@ describe('DashboardPage', () => {
     renderPage()
     expect(await screen.findByText('未登录或登录已过期')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: '重新加载' })).toBeInTheDocument()
+  })
+
+  test('会话失效（401/10002）时清理本地会话', async () => {
+    // 401 文案与“重新加载”按钮在页面内仍可出现一次（兜底提示），
+    // 同时客户端应集中清理 token / profile
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () =>
+        new Response(JSON.stringify({ code: 10002, data: null, message: '未登录或登录已过期' }), {
+          status: 401,
+          headers: { 'content-type': 'application/json' },
+        }),
+      ),
+    )
+    localStorage.setItem('shanye_admin_token', 'expired-token')
+    localStorage.setItem('shanye_admin_profile', JSON.stringify({ ...SEED_PROFILE }))
+    renderPage()
+    expect(await screen.findByText('未登录或登录已过期')).toBeInTheDocument()
+    expect(localStorage.getItem('shanye_admin_token')).toBeNull()
+    expect(localStorage.getItem('shanye_admin_profile')).toBeNull()
   })
 })

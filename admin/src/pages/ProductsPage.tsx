@@ -1,15 +1,19 @@
 import { AlertCircle, Pencil, Plus, RefreshCw, Search } from 'lucide-react'
 import { useCallback, useEffect, useState, type FormEvent } from 'react'
 import {
+  ALL_SPEC_KEYS,
   createProduct,
   fetchAdminProducts,
+  SPEC_GROUP_LABELS,
   updateProduct,
   updateProductStatus,
   type AdminProduct,
   type AdminProductList,
   type ProductPayload,
+  type SpecKey,
 } from '@/api/products'
 import { fetchCategories, type Category } from '@/api/catalog'
+import { fetchStores, type Store } from '@/api/catalog'
 import { ApiError } from '@/api/client'
 import { RoleGuard } from '@/auth/RoleGuard'
 import { formatMoney } from '@/lib/format'
@@ -45,6 +49,7 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { Textarea } from '@/components/ui/textarea'
+import { Checkbox } from '@/components/ui/checkbox'
 
 const STATUS_FILTERS = [
   { value: '', label: '全部状态' },
@@ -56,6 +61,7 @@ const STATUS_FILTERS = [
 /** 商品管理页 */
 export function ProductsPage() {
   const [categories, setCategories] = useState<Category[]>([])
+  const [stores, setStores] = useState<Store[]>([])
   const [data, setData] = useState<AdminProductList | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -95,7 +101,12 @@ export function ProductsPage() {
     fetchCategories()
       .then(setCategories)
       .catch(() => setCategories([]))
+    fetchStores()
+      .then((list) => setStores(Array.isArray(list) ? list : []))
+      .catch(() => setStores([]))
   }, [])
+
+  const storeName = (id: number): string => stores.find((store) => store.id === id)?.name ?? `门店 ${id}`
 
   const toggleSale = async (product: AdminProduct) => {
     try {
@@ -111,6 +122,30 @@ export function ProductsPage() {
     try {
       await updateProductStatus(product.id, { soldOut: !product.soldOut })
       toast.success(product.soldOut ? `已恢复「${product.name}」` : `已标记「${product.name}」售罄`)
+      await load()
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : '操作失败')
+    }
+  }
+
+  /** 按门店切换售罄：传 storeId 只改该门店，不传改全局 */
+  const toggleStoreSoldOut = async (product: AdminProduct, storeId: number | null) => {
+    const soldOutStoreIds = product.soldOutStoreIds ?? []
+    const next = storeId === null ? !product.soldOut : !soldOutStoreIds.includes(storeId)
+    try {
+      await updateProductStatus(
+        product.id,
+        storeId === null ? { soldOut: next } : { soldOut: next, storeId },
+      )
+      toast.success(
+        next
+          ? storeId === null
+            ? `已标记「${product.name}」全部门店售罄`
+            : `已标记「${product.name}」在${storeName(storeId)}售罄`
+          : storeId === null
+            ? `已恢复「${product.name}」`
+            : `已恢复「${product.name}」在${storeName(storeId)}的售卖`,
+      )
       await load()
     } catch (err) {
       toast.error(err instanceof ApiError ? err.message : '操作失败')
@@ -247,56 +282,101 @@ export function ProductsPage() {
                   <TableHead>分类</TableHead>
                   <TableHead className="text-right">价格</TableHead>
                   <TableHead>状态</TableHead>
+                  <TableHead>售罄门店</TableHead>
                   <TableHead className="text-right">操作</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {data?.list.map((product) => (
-                  <TableRow key={product.id}>
-                    <TableCell>
-                      <p className="font-medium">{product.name}</p>
-                      <p className="text-xs text-muted-foreground">{product.subtitle || '—'}</p>
-                    </TableCell>
-                    <TableCell>{product.categoryName}</TableCell>
-                    <TableCell className="text-right tabular-nums">
-                      {formatMoney(product.basePrice)}
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex gap-1.5">
-                        <Badge variant={product.onSale ? 'default' : 'secondary'}>
-                          {product.onSale ? '上架中' : '已下架'}
-                        </Badge>
-                        {product.soldOut ? <Badge variant="destructive">售罄</Badge> : null}
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex justify-end gap-1.5">
+                {data?.list.map((product) => {
+                  const soldOutStoreIds = product.soldOutStoreIds ?? []
+                  return (
+                    <TableRow key={product.id}>
+                      <TableCell>
+                        <p className="font-medium">{product.name}</p>
+                        <p className="text-xs text-muted-foreground">{product.subtitle || '—'}</p>
+                      </TableCell>
+                      <TableCell>{product.categoryName}</TableCell>
+                      <TableCell className="text-right tabular-nums">
+                        {formatMoney(product.basePrice)}
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex flex-wrap gap-1.5">
+                          <Badge variant={product.onSale ? 'default' : 'secondary'}>
+                            {product.onSale ? '上架中' : '已下架'}
+                          </Badge>
+                          {product.soldOut ? <Badge variant="destructive">售罄</Badge> : null}
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex flex-wrap items-center gap-1">
+                          {soldOutStoreIds.length === 0 ? (
+                            <span className="text-xs text-muted-foreground">—</span>
+                          ) : (
+                            soldOutStoreIds.map((id) => (
+                              <Badge key={id} variant="outline" className="font-normal">
+                                {storeName(id)}
+                              </Badge>
+                            ))
+                          )}
+                        </div>
+                        {/* 按门店设置售罄（管理员入口）：传 / 不传 storeId */}
                         <RoleGuard roles={['admin']}>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => {
-                              setEditing(product)
-                              setDialogOpen(true)
-                            }}
-                          >
-                            <Pencil className="size-3.5" />
-                            编辑
-                          </Button>
-                          <Button variant="ghost" size="sm" onClick={() => void toggleSale(product)}>
-                            {product.onSale ? '下架' : '上架'}
-                          </Button>
+                          <div className="mt-1.5 flex flex-wrap gap-1">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="h-6 px-2 text-xs"
+                              onClick={() => void toggleStoreSoldOut(product, null)}
+                            >
+                              {product.soldOut ? '恢复全部门店' : '全部门店售罄'}
+                            </Button>
+                            {stores.map((store) => {
+                              const sold = soldOutStoreIds.includes(store.id)
+                              return (
+                                <Button
+                                  key={store.id}
+                                  variant={sold ? 'destructive' : 'outline'}
+                                  size="sm"
+                                  className="h-6 px-2 text-xs"
+                                  onClick={() => void toggleStoreSoldOut(product, store.id)}
+                                >
+                                  {store.name}
+                                  {sold ? '已售罄' : ''}
+                                </Button>
+                              )
+                            })}
+                          </div>
                         </RoleGuard>
-                        <Button variant="ghost" size="sm" onClick={() => void toggleSoldOut(product)}>
-                          {product.soldOut ? '恢复' : '售罄'}
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex justify-end gap-1.5">
+                          <RoleGuard roles={['admin']}>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => {
+                                setEditing(product)
+                                setDialogOpen(true)
+                              }}
+                            >
+                              <Pencil className="size-3.5" />
+                              编辑
+                            </Button>
+                            <Button variant="ghost" size="sm" onClick={() => void toggleSale(product)}>
+                              {product.onSale ? '下架' : '上架'}
+                            </Button>
+                          </RoleGuard>
+                          <Button variant="ghost" size="sm" onClick={() => void toggleSoldOut(product)}>
+                            {product.soldOut ? '恢复' : '售罄'}
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  )
+                })}
                 {data?.list.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={5} className="py-10 text-center text-muted-foreground">
+                    <TableCell colSpan={6} className="py-10 text-center text-muted-foreground">
                       没有符合条件的商品
                     </TableCell>
                   </TableRow>
@@ -364,6 +444,7 @@ function ProductDialog({ open, product, categories, onClose, onSaved }: ProductD
   const [categoryId, setCategoryId] = useState('')
   const [price, setPrice] = useState('')
   const [sort, setSort] = useState('0')
+  const [specGroups, setSpecGroups] = useState<SpecKey[]>([...ALL_SPEC_KEYS])
   const [error, setError] = useState('')
   const [saving, setSaving] = useState(false)
 
@@ -377,8 +458,20 @@ function ProductDialog({ open, product, categories, onClose, onSaved }: ProductD
     setCategoryId(product ? String(product.categoryId) : (categories[0] ? String(categories[0].id) : ''))
     setPrice(product ? (product.basePrice / 100).toFixed(2) : '')
     setSort(String(product?.sort ?? 0))
+    // 默认继承接口返回的规格组（specKeys），缺省为全部三项
+    setSpecGroups(
+      product?.specKeys && product.specKeys.length > 0
+        ? ALL_SPEC_KEYS.filter((key) => product.specKeys!.includes(key))
+        : [...ALL_SPEC_KEYS],
+    )
     setError('')
   }, [open, product, categories])
+
+  const toggleSpec = (key: SpecKey, checked: boolean) => {
+    setSpecGroups((current) =>
+      checked ? [...ALL_SPEC_KEYS.filter((item) => current.includes(item) || item === key)] : current.filter((item) => item !== key),
+    )
+  }
 
   const onSubmit = async (event: FormEvent) => {
     event.preventDefault()
@@ -410,6 +503,7 @@ function ProductDialog({ open, product, categories, onClose, onSaved }: ProductD
         description: description.trim(),
         basePrice: priceFen,
         sort: sortValue,
+        specGroups,
       }
       if (product) {
         await updateProduct(product.id, payload)
@@ -523,6 +617,25 @@ function ProductDialog({ open, product, categories, onClose, onSaved }: ProductD
               </ul>
             </div>
           ) : null}
+          {/* 规格组：默认继承接口返回的 specKeys */}
+          <div className="space-y-2">
+            <Label>规格组</Label>
+            <div className="flex flex-wrap gap-4">
+              {ALL_SPEC_KEYS.map((key) => (
+                <label key={key} className="flex cursor-pointer items-center gap-2 text-sm">
+                  <Checkbox
+                    aria-label={SPEC_GROUP_LABELS[key]}
+                    checked={specGroups.includes(key)}
+                    onCheckedChange={(value) => toggleSpec(key, value)}
+                  />
+                  {SPEC_GROUP_LABELS[key]}
+                </label>
+              ))}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              轻食 / 周边等无规格商品可全部取消；取消后下单不再要求选择该规格。
+            </p>
+          </div>
           {error ? (
             <p role="alert" className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">
               {error}

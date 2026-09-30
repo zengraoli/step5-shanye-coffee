@@ -83,19 +83,19 @@ describe('PromoPage', () => {
   test('回显当前活动配置（北京时间）与适用商品', async () => {
     renderPage()
     expect(await screen.findByText('第二杯半价')).toBeInTheDocument()
-    // 2026-09-01T00:00Z → 北京时间 08:00
+    // 2026-09-01T00:00Z → 北京时间 08:00；结束时间带秒（23:59:59）保留秒
     const start = screen.getByLabelText('开始时间（北京时间）') as HTMLInputElement
     const end = screen.getByLabelText('结束时间（北京时间）') as HTMLInputElement
     expect(start.value).toBe('2026-09-01T08:00')
-    expect(end.value).toBe('2027-01-01T07:59')
+    expect(end.value).toBe('2027-01-01T07:59:59')
     expect(screen.getByText(/已选 2 款/)).toBeInTheDocument()
-    // 适用商品勾选状态
+    // 适用商品勾选状态（Base UI Checkbox：role=checkbox + aria-checked）
     const coffee = screen.getByText('咖啡')
     expect(coffee).toBeInTheDocument()
-    const checkboxes = screen.getAllByRole('checkbox') as HTMLInputElement[]
-    expect(checkboxes[0]?.checked).toBe(true)
-    expect(checkboxes[1]?.checked).toBe(true)
-    expect(checkboxes[2]?.checked).toBe(false)
+    const checkboxes = screen.getAllByRole('checkbox')
+    expect(checkboxes[0]?.getAttribute('aria-checked')).toBe('true')
+    expect(checkboxes[1]?.getAttribute('aria-checked')).toBe('true')
+    expect(checkboxes[2]?.getAttribute('aria-checked')).toBe('false')
   })
 
   test('保存配置：时间为 UTC ISO8601，商品列表正确', async () => {
@@ -121,6 +121,23 @@ describe('PromoPage', () => {
         startAt: '2026-10-01T00:00:00.000Z',
         productIds: [1, 2, 13],
       })
+    })
+  })
+
+  test('结束时间支持到秒（23:59:59 不再被改成 23:59:00）', async () => {
+    const user = userEvent.setup()
+    renderPage()
+    await screen.findByText('第二杯半价')
+
+    const end = screen.getByLabelText('结束时间（北京时间）') as HTMLInputElement
+    await user.clear(end)
+    await user.type(end, '2026-12-31T23:59:59')
+    expect(end.value).toBe('2026-12-31T23:59:59')
+
+    await user.click(screen.getByRole('button', { name: '保存配置' }))
+    await waitFor(() => {
+      const put = calls.find((call) => call.method === 'PUT' && call.url.includes('/api/v1/admin/promo'))
+      expect(put?.body).toMatchObject({ endAt: '2026-12-31T15:59:59.000Z' })
     })
   })
 
