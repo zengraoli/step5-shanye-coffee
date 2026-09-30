@@ -202,9 +202,10 @@ async function main() {
       `${beforeItem.thresholdFen}/${beforeItem.reduceFen} → ${afterItem.thresholdFen}/${afterItem.reduceFen}`,
     )
 
-    // 满 30 减 30 的新模板对新领取者生效：36 元订单可减 30
-    const claim2 = await api('POST', '/api/v1/coupons/1/claim', { token: await loginMember('13800000002') })
-    record('新会员按新模板领券', claim2.status === 201 && claim2.body.data.reduceFen === 3000, JSON.stringify(claim2.body?.data))
+    // 满 30 减 30 的新模板对新领取者生效：另取一个新会员领券验证
+    const newMember = `138${String(Date.now() % 100000000).padStart(8, '0')}`
+    const claim2 = await api('POST', '/api/v1/coupons/1/claim', { token: await loginMember(newMember) })
+    record('新会员按新模板领券', claim2.status === 201 && claim2.body?.data?.reduceFen === 3000, JSON.stringify(claim2.body?.data))
 
     // 恢复模板，避免影响其它用例
     await api('PUT', '/api/v1/admin/coupons/1', {
