@@ -133,6 +133,9 @@ describe('AccountsPage', () => {
     await user.click(screen.getByRole('button', { name: '新增账号' }))
     const dialog = await screen.findByRole('dialog')
     await user.type(within(dialog).getByLabelText('账号'), 'newstaff')
+    // 店员必须选择绑定门店（不再预置第一家）
+    await user.click(within(dialog).getByLabelText('绑定门店'))
+    await user.click(await screen.findByRole('option', { name: '山野咖啡 · 望京店' }))
     await user.click(within(dialog).getByRole('button', { name: '创建账号' }))
 
     await waitFor(() => {

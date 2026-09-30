@@ -212,7 +212,9 @@ test('编辑优惠券可以调整发放总量，剩余量同步变化', async ()
 })
 
 test('停用券模板后不再推荐，会员券显示已失效', async () => {
-  const { app } = await createTestApp()
+  const { app, db } = await createTestApp()
+  // 固定门店营业，避免用例受当前时间影响
+  forceStoreOpen(db, 1)
   const adminToken = await loginAdmin(app, 'admin')
   const { token, couponId } = await setupMember(app)
   try {
