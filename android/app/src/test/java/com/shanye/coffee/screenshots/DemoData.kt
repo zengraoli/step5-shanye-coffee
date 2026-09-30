@@ -119,6 +119,17 @@ fun demoOrderState() = OrderUiState(
     cartTotalFen = 8400,
     cartPayableFen = 6950,
     promoDiscountFen = 1450,
+    currentStore = StoreDto(
+        id = 1,
+        name = "山野咖啡 · 望京店",
+        address = "北京市朝阳区望京南湖东园一区 212 号",
+        phone = "010-64781234",
+        openTime = "08:00",
+        closeTime = "22:00",
+        status = "open",
+        statusText = "营业中",
+    ),
+    stores = demoStores,
 )
 
 fun demoCheckoutState() = CheckoutUiState(
