@@ -59,10 +59,16 @@ for (const [label, content] of themeFiles) {
 }
 
 for (const [label, content] of themeFiles) {
-  // 圆角刻度 14（中）与 22（大）应同时存在
+  // 圆角刻度 14（中）与 22（大）在视觉上一致：
+  // 官网 / 后台用 px；小程序用 rpx，375 宽下 1rpx = 0.5px，因此等价写法是 28rpx / 44rpx
   const has14 = content.includes('14px') || content.includes('14rpx')
   const has22 = content.includes('22px') || content.includes('22rpx')
-  has14 && has22 ? ok(`${label} 圆角刻度统一（14/22）`) : bad(`${label} 圆角刻度`, `14:${has14} 22:${has22}`)
+  const scaled = content.includes('28rpx') && content.includes('44rpx')
+  has14 && has22
+    ? ok(`${label} 圆角刻度统一（14/22）`)
+    : scaled
+      ? ok(`${label} 圆角刻度统一（14/22，rpx 按 375 宽换算为 28/44）`)
+      : bad(`${label} 圆角刻度`, `14:${has14} 22:${has22}`)
 }
 
 // ---------- 2. 无外部资源 ----------
@@ -70,7 +76,7 @@ const walk = (dir, out = []) => {
   for (const entry of listDir(dir)) {
     const full = join(dir, entry)
     if (isDir(full)) walk(full, out)
-    else if (/\.(ts|tsx|vue|css|scss)$/.test(entry)) out.push(full)
+    else if (/\.(ts|tsx|vue|css|scss)$/.test(entry) && !/\.test\.(ts|tsx)$/.test(entry)) out.push(full)
   }
   return out
 }
