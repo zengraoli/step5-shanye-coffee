@@ -70,6 +70,8 @@ android {
 
 // 单元测试（Robolectric 需要联网下载 android-all 时，可传入代理）
 tasks.withType<Test>().configureEach {
+  // 每次都真正跑测试：不使用构建缓存跳过，保证新写的用例一定被执行
+  outputs.upToDateWhen { false }
   listOf("proxyHost", "proxyPort").forEach { key ->
     (project.findProperty(key) as String?)?.let { value ->
       val names = when (key) {

@@ -24,7 +24,7 @@ npm start          # 运行编译产物
 | `admin` | 管理员 | 全部权限 |
 | `staff` | 店员 | 仅本门店订单、商品售罄状态 |
 
-密码通过环境变量指定；未指定时首次启动自动生成，并打印在启动日志中（仅显示一次，请妥善保存）：
+密码通过环境变量指定；未指定时首次启动自动生成，并打印在控制台一次（不写入任何文件、不进数据库明文，仅演示环境可见）：
 
 ```bash
 ADMIN_PASSWORD=xxx STAFF_PASSWORD=xxx npm run dev
@@ -40,7 +40,7 @@ ADMIN_PASSWORD=xxx STAFF_PASSWORD=xxx npm run dev
 | `npm run build` | TypeScript 编译到 `dist/` |
 | `npm start` | 运行编译产物 |
 | `npm run typecheck` | 类型检查 |
-| `npm test` | 单元测试（node:test，64 个用例） |
+| `npm test` | 单元测试（node:test） |
 | `npm run smoke` | 冒烟脚本：登录 → 下单 → 支付 → 状态推进 → 积分到账 |
 
 ## 环境变量
@@ -85,7 +85,7 @@ ADMIN_PASSWORD=xxx STAFF_PASSWORD=xxx npm run dev
 ## 已知问题
 
 - 支付为模拟支付，未接入真实支付渠道；短信验证码固定为 `123456`。
-- 后台账号暂无“修改密码 / 重置密码”接口，密码目前只能通过环境变量在首次创建时设定（后续任务补充）。
+- 后台账号密码由管理员在后台“重置密码”生成随机密码（返回体一次性给出，前端展示给创建者），首次启动的初始密码同上；生产环境请用 `ADMIN_PASSWORD` / `STAFF_PASSWORD` 指定。
 - 商品 `image` 字段已预留，但种子数据未附带本地图片资源，前端暂用自绘插画占位。
 - SQLite 为单文件数据库，高并发写入依赖 `busy_timeout` 重试，未做读写分离。
 - 优惠券为整券模板发放，暂不支持批量发放与定向发券。

@@ -37,14 +37,19 @@ adb reverse tcp:3000 tcp:3000
 |-|-|
 | `shanye://login` | 会员登录 |
 | `shanye://home` | 首页 |
-| `shanye://order` | 点单 |
+| `shanye://order` | 点单（可带 `?productId=1` 直接打开该商品规格） |
 | `shanye://checkout` | 确认订单 |
 | `shanye://orders` | 我的订单 |
 | `shanye://profile` | 我的 |
-| `shanye://order-detail/{orderId}` | 订单详情 |
+| `shanye://coupons` | 我的优惠券 / 领券中心 |
+| `shanye://order-detail/123` | 订单详情（`123` 为订单 id） |
+
+深链在导航建图后统一消费（冷启动与 App 已运行都支持）；订单详情使用路径参数，
+因此 `shanye://order-detail/123` 与命令示例中的 `shanye://order-detail/123` 一致可用。
 
 ```bash
 adb shell am start -a android.intent.action.VIEW -d "shanye://order"
+adb shell am start -a android.intent.action.VIEW -d "shanye://order-detail/123"
 ```
 
 ## 测试
@@ -56,6 +61,13 @@ adb shell am start -a android.intent.action.VIEW -d "shanye://order"
 ```
 
 截图测试使用 Robolectric + Compose 与演示数据渲染六个页面（登录 / 首页 / 点单 / 确认订单 / 订单详情 / 我的），产出在 `android/screenshots/` 并随仓库提交。
+
+## 导航与登录态
+
+- 底部四个 Tab 可点击切换（`首页 / 点单 / 订单 / 我的`），Tab 间切换保留各 Tab 状态、不堆返回栈。
+- 登录 / 确认订单 / 订单详情等页面不显示底部导航；登录页适配键盘弹出（`imePadding`）。
+- token 失效（`code === 10002`）时统一清理会话并跳登录页，购物车与页面状态不丢失、不闪退。
+- 登录成功自动返回来源页（如从确认订单页跳登录，回来会重新报价）。
 
 ## 已知问题
 
