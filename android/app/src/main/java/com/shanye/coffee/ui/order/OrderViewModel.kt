@@ -164,8 +164,15 @@ class OrderViewModel(
         )
     }
 
-    /** 打开规格弹窗 */
+    /**
+     * 打开规格弹窗。
+     * 无规格商品（轻食 / 周边等，服务端不下发规格组）直接加入购物车，不再要求选杯型温度糖度。
+     */
     fun openSpec(product: ProductDto) {
+        if (product.specs.isEmpty()) {
+            addToCart(product, emptyMap())
+            return
+        }
         _state.update {
             it.copy(
                 specProduct = product,

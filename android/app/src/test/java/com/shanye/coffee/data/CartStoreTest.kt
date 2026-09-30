@@ -101,6 +101,34 @@ class CartStoreTest {
     }
 
     @Test
+    fun `第二杯半价与加购顺序无关`() {
+        CartStore.setPromoProducts(listOf(1L))
+        // 中杯（3200）+ 大杯（3500）
+        CartStore.add(line(1, 3200, 1, mapOf("cup" to "medium", "temp" to "ice", "sugar" to "less")))
+        CartStore.add(line(1, 3500, 1))
+        val mediumFirst = CartStore.promoDiscountFen()
+
+        CartStore.clear()
+        // 大杯 + 中杯：顺序相反，优惠必须一致（半价较便宜的那杯）
+        CartStore.add(line(1, 3500, 1))
+        CartStore.add(line(1, 3200, 1, mapOf("cup" to "medium", "temp" to "ice", "sugar" to "less")))
+        val largeFirst = CartStore.promoDiscountFen()
+
+        assertEquals(largeFirst, mediumFirst)
+        assertEquals(1600, mediumFirst)
+    }
+
+    @Test
+    fun `售后优惠不影响购物车条展示的应付金额`() {
+        CartStore.setPromoProducts(listOf(1L))
+        CartStore.add(line(1, 3200, 2))
+        // 原价 6400，第二杯半价 1600，购物车条按应付 4800 展示
+        assertEquals(6400, CartStore.totalFen)
+        assertEquals(1600, CartStore.promoDiscountFen())
+        assertEquals(4800, CartStore.payableFen)
+    }
+
+    @Test
     fun `修改数量与移除`() {
         CartStore.add(line(1, 3500, 1))
         CartStore.add(line(2, 1800, 1))
