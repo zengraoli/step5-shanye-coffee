@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, ref } from 'vue'
-import { fetchCategories, fetchProducts, fetchStores, type Category, type Product } from '@/api/catalog'
+import { fetchCategories, fetchProducts, fetchStores, type Category, type Product, type Store } from '@/api/catalog'
 import { ApiError } from '@/api/client'
 import { useCart } from '@/composables/useCart'
 import { useCurrentStore } from '@/composables/useCurrentStore'
@@ -43,6 +43,30 @@ const grouped = computed(() =>
   })),
 )
 
+/** 门店选择：点单页也要能切换门店（门店状态与售罄按门店生效） */
+const storePickerOpen = ref(false)
+const stores = ref<Store[]>([])
+
+const openStorePicker = async () => {
+  try {
+    stores.value = await fetchStores()
+    storePickerOpen.value = true
+  } catch (err) {
+    uni.showToast({ title: err instanceof ApiError ? err.message : '门店加载失败', icon: 'none' })
+  }
+}
+
+const chooseStore = (store: Store) => {
+  storePickerOpen.value = false
+  if (currentStore.value?.id === store.id) {
+    return
+  }
+  select(store)
+  loading.value = true
+  // 换门店后重新拉商品（售罄 / 分类都可能不同）
+  void reload()
+}
+
 const specUnitPrice = computed(() => {
   if (!specProduct.value) {
     return 0
@@ -51,7 +75,8 @@ const specUnitPrice = computed(() => {
 })
 
 
-onMounted(async () => {
+/** 拉取菜单（按当前门店） */
+const reload = async () => {
   try {
     // 按当前门店取商品：售罄状态按门店隔离，别店售罄不影响本店点单
     const [categoryList, productResult] = await Promise.all([
@@ -79,7 +104,9 @@ onMounted(async () => {
   } finally {
     loading.value = false
   }
-})
+}
+
+onMounted(reload)
 
 /**
  * 测量各分类区块相对滚动内容的偏移，用于滚动联动。
@@ -229,12 +256,13 @@ const goCheckout = () => {
 
 <template>
   <view class="order-page">
-    <!-- 门店与营业状态 -->
-    <view class="order-store">
+    <!-- 门店与营业状态：点击可切换门店 -->
+    <view class="order-store" @click="openStorePicker">
       <text class="order-store__name">{{ currentStore?.name ?? '请选择门店' }}</text>
       <text class="chip" :class="isOpen ? 'chip--open' : 'chip--rest'">
         {{ currentStore?.statusText ?? '—' }}
       </text>
+      <text class="order-store__more">切换 ›</text>
     </view>
 
     <view v-if="loading" class="order-tip">菜单加载中…</view>
@@ -353,6 +381,33 @@ const goCheckout = () => {
       </scroll-view>
     </view>
 
+    <!-- 门店选择弹层 -->
+    <view v-if="storePickerOpen" class="store-mask" @click="storePickerOpen = false">
+      <view class="store-picker" @click.stop>
+        <view class="store-picker__head">
+          <text class="store-picker__title">选择门店</text>
+          <text class="store-picker__close" @click="storePickerOpen = false">完成</text>
+        </view>
+        <scroll-view class="store-picker__list" scroll-y>
+          <view
+            v-for="store in stores"
+            :key="store.id"
+            class="store-picker__item"
+            :class="{ 'is-active': store.id === currentStore?.id }"
+            @click="chooseStore(store)"
+          >
+            <view class="store-picker__info">
+              <text class="store-picker__name">{{ store.name }}</text>
+              <text class="store-picker__time">{{ store.openTime }} - {{ store.closeTime }}</text>
+            </view>
+            <text class="chip" :class="store.status === 'open' ? 'chip--open' : 'chip--rest'">
+              {{ store.statusText }}
+            </text>
+          </view>
+        </scroll-view>
+      </view>
+    </view>
+
     <!-- 底部购物车栏 -->
     <view class="cart-bar" :class="{ 'is-hidden': cartOpen }">
       <view class="cart-bar__icon" @click="cartOpen = !cartOpen">
@@ -397,6 +452,84 @@ export default {
 }
 
 /* ---------- 门店栏 ---------- */
+.order-store {
+  cursor: pointer;
+}
+
+.order-store__more {
+  margin-left: $space-2;
+  font-size: 20rpx;
+  color: $color-text-faint;
+}
+
+/* ---------- 门店选择弹层 ---------- */
+.store-mask {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  background: rgb(43 33 24 / 45%);
+}
+
+.store-picker {
+  max-height: 62vh;
+  padding: $space-4;
+  border-radius: $radius-lg $radius-lg 0 0;
+  background: $color-surface;
+}
+
+.store-picker__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: $space-3;
+}
+
+.store-picker__title {
+  font-size: 30rpx;
+  font-weight: 600;
+  color: $color-text;
+}
+
+.store-picker__close {
+  font-size: 24rpx;
+  color: $color-accent-strong;
+}
+
+.store-picker__list {
+  max-height: 46vh;
+}
+
+.store-picker__item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: $space-3 0;
+  border-bottom: 1rpx solid $color-line;
+}
+
+.store-picker__item.is-active .store-picker__name {
+  color: $color-accent-strong;
+}
+
+.store-picker__info {
+  display: flex;
+  flex-direction: column;
+  gap: 4rpx;
+}
+
+.store-picker__name {
+  font-size: 28rpx;
+  color: $color-text;
+}
+
+.store-picker__time {
+  font-size: 20rpx;
+  color: $color-text-faint;
+}
+
 .order-store {
   display: flex;
   align-items: center;
