@@ -33,7 +33,7 @@ page.on('console', (msg) => {
 })
 
 const shot = async (name) => {
-  await page.screenshot({ path: `screenshots/admin-${MODE}-${name}.png`, fullPage: true })
+  await page.screenshot({ path: `${process.cwd()}/../docs/screenshots/admin-${MODE}-${name}.png`, fullPage: true })
 }
 
 async function login(username, password) {

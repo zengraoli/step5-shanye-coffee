@@ -18,7 +18,7 @@ page.on('console', (msg) => {
 })
 
 const shot = async (name) => {
-  await page.screenshot({ path: `${process.cwd()}/screenshots/miniapp-${name}.png`, fullPage: false })
+  await page.screenshot({ path: `${process.cwd()}/../docs/screenshots/miniapp-${name}.png`, fullPage: false })
 }
 
 // 1. 登录页：输入框可输入、高度正常
@@ -122,4 +122,4 @@ await browser.close()
 
 const failed = results.filter((item) => !item.ok)
 console.log(`\n小程序 H5 375 宽核验：通过 ${results.length - failed.length} 项，失败 ${failed.length} 项`)
-fs.writeFileSync(`${process.cwd()}/screenshots/miniapp-verify.json`, JSON.stringify(results, null, 2))
+fs.writeFileSync(`${process.cwd()}/../docs/screenshots/miniapp-verify.json`, JSON.stringify(results, null, 2))
