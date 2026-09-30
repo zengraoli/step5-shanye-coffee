@@ -142,7 +142,8 @@ function serializeOrder(db: Db, order: OrderRow): OrderDetail {
   if (order.member_coupon_id !== null) {
     const row = db
       .prepare(
-        `SELECT mc.id, c.name FROM member_coupons mc JOIN coupons c ON c.id = mc.coupon_id WHERE mc.id = ?`,
+        `SELECT mc.id, COALESCE(NULLIF(mc.name, ''), c.name) AS name
+         FROM member_coupons mc JOIN coupons c ON c.id = mc.coupon_id WHERE mc.id = ?`,
       )
       .get(order.member_coupon_id) as unknown as { id: number; name: string } | undefined
     if (row) {
@@ -190,6 +191,76 @@ function serializeOrder(db: Db, order: OrderRow): OrderDetail {
   }
 }
 
+/** 会员券行：字段为领取时的模板快照，另带模板当前状态 */
+interface MemberCouponRow {
+  id: number
+  member_id: number
+  status: string
+  valid_from: string
+  valid_to: string
+  name: string
+  type: string
+  threshold_fen: number
+  reduce_fen: number
+  discount_percent: number
+  max_reduce_fen: number
+  template_status: string
+}
+
+const MEMBER_COUPON_SELECT = `SELECT mc.id, mc.member_id, mc.status, mc.valid_from, mc.valid_to,
+       mc.name, mc.type, mc.threshold_fen, mc.reduce_fen, mc.discount_percent, mc.max_reduce_fen,
+       c.status AS template_status
+  FROM member_coupons mc JOIN coupons c ON c.id = mc.coupon_id`
+
+/** 取出当前会员名下可用的会员券（未使用、未过期、模板未停用） */
+function loadUsableMemberCoupon(db: Db, memberId: number, memberCouponId: number): MemberCouponRow {
+  const row = db.prepare(`${MEMBER_COUPON_SELECT} WHERE mc.id = ? AND mc.member_id = ?`).get(memberCouponId, memberId) as
+    | MemberCouponRow
+    | undefined
+  if (!row) {
+    fail('COUPON_NOT_FOUND', '优惠券不存在或不属于当前会员')
+  }
+  if (row.status !== 'unused') {
+    fail('COUPON_USED')
+  }
+  if (row.template_status !== 'active') {
+    fail('COUPON_NOT_FOUND', '优惠券已停用')
+  }
+  const like: CouponLike = {
+    id: Number(row.id),
+    type: String(row.type) as CouponLike['type'],
+    thresholdFen: Number(row.threshold_fen),
+    reduceFen: Number(row.reduce_fen),
+    discountPercent: Number(row.discount_percent),
+    maxReduceFen: Number(row.max_reduce_fen),
+    validFrom: String(row.valid_from),
+    validTo: String(row.valid_to),
+  }
+  if (!isWithinValidity(like)) {
+    fail('COUPON_EXPIRED')
+  }
+  return row
+}
+
+/** 根据会员券快照计算实际可减免金额；不可用时抛错 */
+function couponDiscountForRow(row: MemberCouponRow, afterPromoFen: number): number {
+  const like: CouponLike = {
+    id: Number(row.id),
+    type: String(row.type) as CouponLike['type'],
+    thresholdFen: Number(row.threshold_fen),
+    reduceFen: Number(row.reduce_fen),
+    discountPercent: Number(row.discount_percent),
+    maxReduceFen: Number(row.max_reduce_fen),
+    validFrom: String(row.valid_from),
+    validTo: String(row.valid_to),
+  }
+  const discount = couponDiscountFen(like, afterPromoFen)
+  if (discount <= 0) {
+    fail('COUPON_NOT_APPLICABLE')
+  }
+  return discount
+}
+
 interface CreateOrderBody {
   storeId?: unknown
   orderType?: unknown
@@ -233,44 +304,13 @@ export async function orderRoutes(app: FastifyInstance): Promise<void> {
       const promoDiscountFen = promo.discountFen
       const afterPromoFen = totalFen - promoDiscountFen
 
-      // 优惠券校验（不核销，支付时才核销）
+      // 优惠券校验（不核销，支付时才核销；支付前会再校验一次）
       let memberCouponId: number | null = null
       let discountFen = 0
       if (body.memberCouponId !== undefined && body.memberCouponId !== null && body.memberCouponId !== '') {
-        const row = db
-          .prepare(
-            `SELECT mc.*, c.name, c.type, c.threshold_fen, c.reduce_fen, c.discount_percent, c.max_reduce_fen
-             FROM member_coupons mc JOIN coupons c ON c.id = mc.coupon_id
-             WHERE mc.id = ? AND mc.member_id = ?`,
-          )
-          .get(Number(body.memberCouponId), member.id) as unknown as
-          | (Record<string, unknown> & { status: string; valid_from: string; valid_to: string })
-          | undefined
-        if (!row) {
-          fail('COUPON_NOT_FOUND', '优惠券不存在或不属于当前会员')
-        }
-        if (row.status !== 'unused') {
-          fail('COUPON_USED')
-        }
-        const like: CouponLike = {
-          id: Number(row.id),
-          type: String(row.type) as CouponLike['type'],
-          thresholdFen: Number(row.threshold_fen),
-          reduceFen: Number(row.reduce_fen),
-          discountPercent: Number(row.discount_percent),
-          maxReduceFen: Number(row.max_reduce_fen),
-          validFrom: String(row.valid_from),
-          validTo: String(row.valid_to),
-        }
-        if (!isWithinValidity(like)) {
-          fail('COUPON_EXPIRED')
-        }
-        const discount = couponDiscountFen(like, afterPromoFen)
-        if (discount <= 0) {
-          fail('COUPON_NOT_APPLICABLE')
-        }
-        memberCouponId = Number(row.id)
-        discountFen = discount
+        const row = loadUsableMemberCoupon(db, member.id, Number(body.memberCouponId))
+        discountFen = couponDiscountForRow(row, afterPromoFen)
+        memberCouponId = row.id
       }
 
       const orderId = withTransaction(db, () => {
@@ -376,13 +416,40 @@ export async function orderRoutes(app: FastifyInstance): Promise<void> {
       const now = new Date().toISOString()
       const pickupCode = uniquePickupCode(db)
       withTransaction(db, () => {
-        db.prepare(
-          `UPDATE orders SET status = 'paid', paid_at = ?, pickup_code = ? WHERE id = ?`,
-        ).run(now, pickupCode, id)
+        // 支付前重新校验优惠券：已被其他订单用掉、已过期或已停用时不允许支付
         if (order.member_coupon_id !== null) {
-          db.prepare(
-            `UPDATE member_coupons SET status = 'used', used_at = ? WHERE id = ? AND status = 'unused'`,
-          ).run(now, order.member_coupon_id)
+          const coupon = db
+            .prepare('SELECT mc.status AS status, c.status AS template_status, mc.valid_to AS valid_to FROM member_coupons mc JOIN coupons c ON c.id = mc.coupon_id WHERE mc.id = ?')
+            .get(order.member_coupon_id) as unknown as
+            | { status: string; template_status: string; valid_to: string }
+            | undefined
+          if (!coupon || coupon.status !== 'unused') {
+            fail('COUPON_USED')
+          }
+          if (coupon.template_status !== 'active') {
+            fail('COUPON_NOT_FOUND', '优惠券已停用')
+          }
+          if (new Date(coupon.valid_to).getTime() < Date.now()) {
+            fail('COUPON_EXPIRED')
+          }
+        }
+        const info = db
+          .prepare(
+            `UPDATE orders SET status = 'paid', paid_at = ?, pickup_code = ? WHERE id = ? AND status = 'pending_pay'`,
+          )
+          .run(now, pickupCode, id)
+        if (info.changes === 0) {
+          fail('ORDER_STATUS_INVALID', '订单状态已变化，请刷新后重试')
+        }
+        if (order.member_coupon_id !== null) {
+          const consumed = db
+            .prepare(
+              `UPDATE member_coupons SET status = 'used', used_at = ? WHERE id = ? AND status = 'unused'`,
+            )
+            .run(now, order.member_coupon_id)
+          if (consumed.changes === 0) {
+            fail('COUPON_USED')
+          }
         }
         // 支付后按实付金额发放积分并自动升级等级
         grantPointsForOrder(db, member.id, id, order.pay_fen)

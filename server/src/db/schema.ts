@@ -59,7 +59,14 @@ export const MIGRATIONS: string[] = [
     valid_from TEXT NOT NULL,
     valid_to TEXT NOT NULL,
     obtained_at TEXT NOT NULL,
-    used_at TEXT
+    used_at TEXT,
+    -- 以下为领取时的模板快照：后台改模板不影响已领取的券
+    name TEXT NOT NULL DEFAULT '',
+    type TEXT NOT NULL DEFAULT 'full_reduction',
+    threshold_fen INTEGER NOT NULL DEFAULT 0,
+    reduce_fen INTEGER NOT NULL DEFAULT 0,
+    discount_percent INTEGER NOT NULL DEFAULT 100,
+    max_reduce_fen INTEGER NOT NULL DEFAULT 0
   )`,
   `CREATE TABLE IF NOT EXISTS admin_users (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -151,6 +158,41 @@ export function migrateSchema(db: {
   if (!columns.some((column) => column.name === 'promo_discount_fen')) {
     db.exec('ALTER TABLE orders ADD COLUMN promo_discount_fen INTEGER NOT NULL DEFAULT 0')
   }
+  addMemberCouponSnapshotColumns(db)
+}
+
+function addColumn(db: { exec: (sql: string) => unknown }, table: string, column: string, ddl: string, columns: { name: string }[]): void {
+  if (!columns.some((item) => item.name === column)) {
+    db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${ddl}`)
+  }
+}
+
+/**
+ * 会员券快照字段：领取时把券模板的名称与优惠条件复制到会员券上，
+ * 之后后台编辑券模板不会影响已领取的券（弹窗承诺“对新领取的券生效”）。
+ */
+function addMemberCouponSnapshotColumns(db: {
+  prepare: (sql: string) => { all: () => unknown[] }
+  exec: (sql: string) => unknown
+}): void {
+  const columns = db.prepare('PRAGMA table_info(member_coupons)').all() as { name: string }[]
+  addColumn(db, 'member_coupons', 'name', 'TEXT NOT NULL DEFAULT \'\'', columns)
+  addColumn(db, 'member_coupons', 'type', 'TEXT NOT NULL DEFAULT \'full_reduction\'', columns)
+  addColumn(db, 'member_coupons', 'threshold_fen', 'INTEGER NOT NULL DEFAULT 0', columns)
+  addColumn(db, 'member_coupons', 'reduce_fen', 'INTEGER NOT NULL DEFAULT 0', columns)
+  addColumn(db, 'member_coupons', 'discount_percent', 'INTEGER NOT NULL DEFAULT 100', columns)
+  addColumn(db, 'member_coupons', 'max_reduce_fen', 'INTEGER NOT NULL DEFAULT 0', columns)
+  // 旧数据按模板回填一次（name 为空表示尚未快照）
+  db.exec(`
+    UPDATE member_coupons SET
+      name = (SELECT c.name FROM coupons c WHERE c.id = member_coupons.coupon_id),
+      type = (SELECT c.type FROM coupons c WHERE c.id = member_coupons.coupon_id),
+      threshold_fen = (SELECT c.threshold_fen FROM coupons c WHERE c.id = member_coupons.coupon_id),
+      reduce_fen = (SELECT c.reduce_fen FROM coupons c WHERE c.id = member_coupons.coupon_id),
+      discount_percent = (SELECT c.discount_percent FROM coupons c WHERE c.id = member_coupons.coupon_id),
+      max_reduce_fen = (SELECT c.max_reduce_fen FROM coupons c WHERE c.id = member_coupons.coupon_id)
+    WHERE name = '' AND coupon_id IN (SELECT id FROM coupons)
+  `)
 }
 
 /** 执行建表（幂等） */

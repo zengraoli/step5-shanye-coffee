@@ -39,13 +39,20 @@ interface MemberCouponRow {
   valid_to: string
   obtained_at: string
   used_at: string | null
+  /** 领取时的模板快照（后台编辑模板不影响已领取的券） */
   name: string
   type: string
   threshold_fen: number
   reduce_fen: number
   discount_percent: number
   max_reduce_fen: number
+  /** 券模板当前是否停用（停用后不可再使用 / 不会被推荐） */
+  template_status: string
 }
+
+/** 会员券列表 / 报价统一使用的查询：自带模板停用状态 */
+const MEMBER_COUPON_SELECT = `SELECT mc.*, c.status AS template_status
+       FROM member_coupons mc JOIN coupons c ON c.id = mc.coupon_id`
 
 function serializeTemplate(row: CouponRow) {
   return {
@@ -87,12 +94,11 @@ function toCouponLike(row: {
 }
 
 function serializeMemberCoupon(row: MemberCouponRow, now: Date) {
-  const expired = row.status === 'unused' && !isWithinValidity(
-    { ...toCouponLike(row), validFrom: row.valid_from, validTo: row.valid_to },
-    now,
-  )
+  const templateActive = row.template_status === 'active'
+  const expired = row.status === 'unused' && !isWithinValidity(toCouponLike(row), now)
   const status = expired ? 'expired' : row.status
-  const statusText = status === 'unused' ? '未使用' : status === 'used' ? '已使用' : '已过期'
+  const baseText = status === 'unused' ? '未使用' : status === 'used' ? '已使用' : '已过期'
+  const statusText = status === 'unused' && !templateActive ? '已失效' : baseText
   return {
     id: row.id,
     couponId: row.coupon_id,
@@ -107,6 +113,10 @@ function serializeMemberCoupon(row: MemberCouponRow, now: Date) {
     validTo: row.valid_to,
     status,
     statusText,
+    /** 券模板是否已被后台停用（停用后不可使用、不会被推荐） */
+    templateStatus: row.template_status,
+    /** 当前是否可用于下单 */
+    usable: status === 'unused' && templateActive && !expired,
     obtainedAt: row.obtained_at,
     usedAt: row.used_at,
   }
@@ -132,11 +142,7 @@ export async function couponRoutes(app: FastifyInstance): Promise<void> {
       const member = request.member!
       const filter = request.query.status
       const rows = db
-        .prepare(
-          `SELECT mc.*, c.name, c.type, c.threshold_fen, c.reduce_fen, c.discount_percent, c.max_reduce_fen
-           FROM member_coupons mc JOIN coupons c ON c.id = mc.coupon_id
-           WHERE mc.member_id = ? ORDER BY mc.id DESC`,
-        )
+        .prepare(`${MEMBER_COUPON_SELECT} WHERE mc.member_id = ? ORDER BY mc.id DESC`)
         .all(member.id) as unknown as MemberCouponRow[]
       const now = new Date()
       let list = rows.map((row) => serializeMemberCoupon(row, now))
@@ -171,19 +177,28 @@ export async function couponRoutes(app: FastifyInstance): Promise<void> {
       const id = withTransaction(db, () => {
         const info = db
           .prepare(
-            `INSERT INTO member_coupons (coupon_id, member_id, status, valid_from, valid_to, obtained_at)
-             VALUES (?, ?, 'unused', ?, ?, ?)`,
+            `INSERT INTO member_coupons
+               (coupon_id, member_id, status, valid_from, valid_to, obtained_at,
+                name, type, threshold_fen, reduce_fen, discount_percent, max_reduce_fen)
+             VALUES (?, ?, 'unused', ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
           )
-          .run(couponId, member.id, now.toISOString(), validTo.toISOString(), now.toISOString())
+          .run(
+            couponId,
+            member.id,
+            now.toISOString(),
+            validTo.toISOString(),
+            now.toISOString(),
+            template.name,
+            template.type,
+            template.threshold_fen,
+            template.reduce_fen,
+            template.discount_percent,
+            template.max_reduce_fen,
+          )
         db.prepare('UPDATE coupons SET remaining = remaining - 1 WHERE id = ?').run(couponId)
         return Number(info.lastInsertRowid)
       })
-      const row = db
-        .prepare(
-          `SELECT mc.*, c.name, c.type, c.threshold_fen, c.reduce_fen, c.discount_percent, c.max_reduce_fen
-           FROM member_coupons mc JOIN coupons c ON c.id = mc.coupon_id WHERE mc.id = ?`,
-        )
-        .get(id) as unknown as MemberCouponRow
+      const row = db.prepare(`${MEMBER_COUPON_SELECT} WHERE mc.id = ?`).get(id) as unknown as MemberCouponRow
       return sendOk(reply, serializeMemberCoupon(row, now), 201)
     })
 
@@ -225,9 +240,8 @@ export async function couponRoutes(app: FastifyInstance): Promise<void> {
 
       const ownCoupons = db
         .prepare(
-          `SELECT mc.*, c.name, c.type, c.threshold_fen, c.reduce_fen, c.discount_percent, c.max_reduce_fen
-           FROM member_coupons mc JOIN coupons c ON c.id = mc.coupon_id
-           WHERE mc.member_id = ? AND mc.status = 'unused' ORDER BY mc.id`,
+          `${MEMBER_COUPON_SELECT}
+           WHERE mc.member_id = ? AND mc.status = 'unused' AND c.status = 'active' ORDER BY mc.id`,
         )
         .all(member.id) as unknown as MemberCouponRow[]
 
@@ -335,6 +349,25 @@ export async function couponRoutes(app: FastifyInstance): Promise<void> {
       total?: unknown
     }
 
+    /** 读取数值字段（缺失时保持原值） */
+    function readInt(
+      value: unknown,
+      fallback: number,
+      options: { min: number; max: number; allowZero: boolean; message: string },
+    ): number {
+      if (value === undefined || value === null || value === '') {
+        return fallback
+      }
+      const num = Number(value)
+      if (!Number.isInteger(num)) {
+        fail('BAD_REQUEST', options.message)
+      }
+      if (num < options.min || (num === 0 && !options.allowZero) || num > options.max) {
+        fail('BAD_REQUEST', options.message)
+      }
+      return num
+    }
+
     instance.post<{ Body: CouponPayload }>('/api/v1/admin/coupons', { schema: { tags: ['admin', 'coupons'], summary: '新增优惠券模板', security: [{ adminBearer: [] }] } }, async (request, reply) => {
       const payload = request.body ?? {}
       const name = typeof payload.name === 'string' ? payload.name.trim() : ''
@@ -345,34 +378,33 @@ export async function couponRoutes(app: FastifyInstance): Promise<void> {
       if (type !== 'full_reduction' && type !== 'discount') {
         fail('BAD_REQUEST', '券类型必须是 full_reduction 或 discount')
       }
-      const thresholdFen = Number(payload.thresholdFen ?? 0)
-      const reduceFen = Number(payload.reduceFen ?? 0)
-      const discountPercent = Number(payload.discountPercent ?? 100)
-      const maxReduceFen = Number(payload.maxReduceFen ?? 0)
-      const validDays = Number(payload.validDays ?? 7)
-      const total = Number(payload.total ?? 0)
-      if (!Number.isInteger(thresholdFen) || thresholdFen < 0) {
-        fail('BAD_REQUEST', '使用门槛必须为不小于 0 的整数分')
-      }
-      if (!Number.isInteger(validDays) || validDays <= 0 || validDays > 365) {
-        fail('BAD_REQUEST', '有效天数必须为 1-365 的整数')
-      }
-      if (!Number.isInteger(total) || total <= 0 || total > 100000) {
-        fail('BAD_REQUEST', '发放总量必须为 1-100000 的整数')
-      }
+      const thresholdFen = readInt(payload.thresholdFen, 0, {
+        min: 0, max: 100000000, allowZero: true, message: '使用门槛必须为不小于 0 的整数分',
+      })
+      const reduceFen = readInt(payload.reduceFen, 0, {
+        min: 0, max: 100000000, allowZero: true, message: '满减券减免金额必须为大于 0 的整数分',
+      })
+      const discountPercent = readInt(payload.discountPercent, 100, {
+        min: 1, max: 99, allowZero: false, message: '折扣必须在 1-99 之间',
+      })
+      const maxReduceFen = readInt(payload.maxReduceFen, 0, {
+        min: 0, max: 100000000, allowZero: true, message: '最高减免必须为不小于 0 的整数分',
+      })
+      const validDays = readInt(payload.validDays, 7, {
+        min: 1, max: 365, allowZero: false, message: '有效天数必须为 1-365 的整数',
+      })
+      const total = readInt(payload.total, 0, {
+        min: 1, max: 100000, allowZero: false, message: '发放总量必须为 1-100000 的整数',
+      })
       if (type === 'full_reduction') {
-        if (!Number.isInteger(reduceFen) || reduceFen <= 0) {
+        if (reduceFen <= 0) {
           fail('BAD_REQUEST', '满减券减免金额必须为大于 0 的整数分')
         }
         if (thresholdFen <= 0) {
           fail('BAD_REQUEST', '满减券使用门槛必须大于 0')
         }
-      } else {
-        if (!Number.isInteger(discountPercent) || discountPercent <= 0 || discountPercent >= 100) {
-          fail('BAD_REQUEST', '折扣必须在 1-99 之间')
-        }
-        if (!Number.isInteger(maxReduceFen) || maxReduceFen < 0) {
-          fail('BAD_REQUEST', '最高减免必须为不小于 0 的整数分')
+        if (reduceFen > thresholdFen) {
+          fail('BAD_REQUEST', '减免金额不能大于使用门槛')
         }
       }
       const info = db
@@ -386,7 +418,7 @@ export async function couponRoutes(app: FastifyInstance): Promise<void> {
           thresholdFen,
           type === 'full_reduction' ? reduceFen : 0,
           type === 'discount' ? discountPercent : 100,
-          maxReduceFen,
+          type === 'discount' ? maxReduceFen : 0,
           validDays,
           total,
           total,
@@ -416,38 +448,61 @@ export async function couponRoutes(app: FastifyInstance): Promise<void> {
         updates.push('name = ?')
         params.push(name)
       }
-      if (payload.thresholdFen !== undefined) {
-        const value = Number(payload.thresholdFen)
-        if (!Number.isInteger(value) || value < 0) {
-          fail('BAD_REQUEST', '使用门槛必须为不小于 0 的整数分')
-        }
-        updates.push('threshold_fen = ?')
-        params.push(value)
+      // 类型切换：切换后重置另一类型的专属字段，避免出现“满 ¥0.00 减 ¥6.00”这类脏数据
+      const nextType = payload.type !== undefined ? payload.type : existing.type
+      if (payload.type !== undefined && payload.type !== 'full_reduction' && payload.type !== 'discount') {
+        fail('BAD_REQUEST', '券类型必须是 full_reduction 或 discount')
       }
-      if (payload.reduceFen !== undefined) {
-        const value = Number(payload.reduceFen)
-        if (!Number.isInteger(value) || value <= 0) {
+      if (payload.type !== undefined) {
+        updates.push('type = ?')
+        params.push(payload.type as string)
+      }
+
+      const thresholdFen = payload.thresholdFen !== undefined && payload.thresholdFen !== null && payload.thresholdFen !== ''
+        ? Number(payload.thresholdFen)
+        : (nextType === 'full_reduction' ? existing.threshold_fen : 0)
+      if (!Number.isInteger(thresholdFen) || thresholdFen < 0) {
+        fail('BAD_REQUEST', '使用门槛必须为不小于 0 的整数分')
+      }
+
+      const reduceFen = payload.reduceFen !== undefined && payload.reduceFen !== null && payload.reduceFen !== ''
+        ? Number(payload.reduceFen)
+        : (nextType === 'full_reduction' ? existing.reduce_fen : 0)
+      if (nextType === 'full_reduction' && (!Number.isInteger(reduceFen) || reduceFen < 0)) {
+        fail('BAD_REQUEST', '满减券减免金额必须为大于 0 的整数分')
+      }
+
+      const discountPercent = payload.discountPercent !== undefined && payload.discountPercent !== null && payload.discountPercent !== ''
+        ? Number(payload.discountPercent)
+        : (nextType === 'discount' ? existing.discount_percent : 100)
+      if (nextType === 'discount' && (!Number.isInteger(discountPercent) || discountPercent <= 0 || discountPercent >= 100)) {
+        fail('BAD_REQUEST', '折扣必须在 1-99 之间')
+      }
+
+      const maxReduceFen = payload.maxReduceFen !== undefined && payload.maxReduceFen !== null && payload.maxReduceFen !== ''
+        ? Number(payload.maxReduceFen)
+        : (nextType === 'discount' ? existing.max_reduce_fen : 0)
+      if (nextType === 'discount' && (!Number.isInteger(maxReduceFen) || maxReduceFen < 0)) {
+        fail('BAD_REQUEST', '最高减免必须为不小于 0 的整数分')
+      }
+
+      if (nextType === 'full_reduction') {
+        if (reduceFen <= 0) {
           fail('BAD_REQUEST', '满减券减免金额必须为大于 0 的整数分')
         }
-        updates.push('reduce_fen = ?')
-        params.push(value)
-      }
-      if (payload.discountPercent !== undefined) {
-        const value = Number(payload.discountPercent)
-        if (!Number.isInteger(value) || value <= 0 || value >= 100) {
-          fail('BAD_REQUEST', '折扣必须在 1-99 之间')
+        if (thresholdFen <= 0) {
+          fail('BAD_REQUEST', '满减券使用门槛必须大于 0')
         }
-        updates.push('discount_percent = ?')
-        params.push(value)
-      }
-      if (payload.maxReduceFen !== undefined) {
-        const value = Number(payload.maxReduceFen)
-        if (!Number.isInteger(value) || value < 0) {
-          fail('BAD_REQUEST', '最高减免必须为不小于 0 的整数分')
+        if (reduceFen > thresholdFen) {
+          fail('BAD_REQUEST', '减免金额不能大于使用门槛')
         }
-        updates.push('max_reduce_fen = ?')
-        params.push(value)
+        updates.push('threshold_fen = ?', 'reduce_fen = ?', 'discount_percent = 100', 'max_reduce_fen = 0')
+        params.push(thresholdFen, reduceFen)
+      } else {
+        updates.push('threshold_fen = ?', 'reduce_fen = 0', 'discount_percent = ?', 'max_reduce_fen = ?')
+        params.push(thresholdFen, discountPercent, maxReduceFen)
       }
+
       if (payload.validDays !== undefined) {
         const value = Number(payload.validDays)
         if (!Number.isInteger(value) || value <= 0 || value > 365) {
@@ -456,11 +511,27 @@ export async function couponRoutes(app: FastifyInstance): Promise<void> {
         updates.push('valid_days = ?')
         params.push(value)
       }
+      if (payload.total !== undefined) {
+        const value = Number(payload.total)
+        if (!Number.isInteger(value) || value <= 0 || value > 100000) {
+          fail('BAD_REQUEST', '发放总量必须为 1-100000 的整数')
+        }
+        if (value < existing.total - existing.remaining) {
+          fail('BAD_REQUEST', '发放总量不能小于已被领取的数量')
+        }
+        updates.push('total = ?')
+        params.push(value)
+        // 已领取数量不变，调大总量时剩余量同步增加
+        updates.push('remaining = ?')
+        params.push(value - (existing.total - existing.remaining))
+      }
       if (updates.length === 0) {
         fail('BAD_REQUEST', '没有需要更新的字段')
       }
       params.push(id)
-      db.prepare(`UPDATE coupons SET ${updates.join(', ')} WHERE id = ?`).run(...params)
+      withTransaction(db, () => {
+        db.prepare(`UPDATE coupons SET ${updates.join(', ')} WHERE id = ?`).run(...params)
+      })
       const updated = db.prepare('SELECT * FROM coupons WHERE id = ?').get(id) as unknown as CouponRow
       return sendOk(reply, serializeTemplate(updated))
     })
